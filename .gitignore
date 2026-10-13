@@ -1,0 +1,13 @@
+node_modules/
+.npm-cache/
+*.log
+.codex/
+.agents/
+.aws/
+.env
+.env.*
+!.env.example
+.kube/
+actions-runner/
+_work/
+coverage/

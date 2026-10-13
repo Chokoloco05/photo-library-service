@@ -1,0 +1,13 @@
+{
+  "name": "photo-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Photo Library Service - Kubernetes deployment pipeline",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check app.js && node --check server.js && node --check identity.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": { "express": "5.3.0" }
+}

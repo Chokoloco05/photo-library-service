@@ -1,0 +1,83 @@
+name: Milestone 2 - Test pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize pipelines for main; a new push never cancels an ongoing rollout.
+concurrency:
+  group: photo-test-${{ github.repository }}-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  unit-tests:
+    name: Unit and HTTP tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check JavaScript syntax
+        run: npm run check
+      - name: Run tests
+        run: npm test
+
+  build-and-deploy-test:
+    name: Build image and roll out to Test
+    needs: unit-tests
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Windows, X64, photo-local]
+    timeout-minutes: 20
+    environment: test
+    defaults:
+      run:
+        shell: powershell
+    env:
+      IMAGE: photo-service:sha-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check local Docker and Kubernetes
+        run: |
+          docker --context desktop-linux info --format '{{.OSType}}'
+          if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop is not available.' }
+          kubectl --context docker-desktop get nodes --request-timeout=15s
+          if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop Kubernetes is not available.' }
+      - name: Build a unique image for this commit and run
+        run: |
+          docker --context desktop-linux build --build-arg "APP_REVISION=$env:REVISION" -t $env:IMAGE .
+          if ($LASTEXITCODE -ne 0) { throw 'Image build failed.' }
+      - name: Roll out and verify the deployed revision through Ingress
+        run: |
+          & .\scripts\deploy-test.ps1 -Image $env:IMAGE -ExpectedRevision $env:REVISION
+      - name: Record deployment evidence
+        run: |
+          @"
+          ## Test deployment
+          - Commit: $env:REVISION
+          - Image: $env:IMAGE
+          - Namespace: test
+          - Ingress host: photo-test.local
+          - Rollout and HTTP smoke checks: passed
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl --context docker-desktop get pods -n test -o wide --request-timeout=15s
+          kubectl --context docker-desktop describe deployment/photo-service -n test --request-timeout=15s
+          kubectl --context docker-desktop get events -n test --sort-by=.metadata.creationTimestamp --request-timeout=15s
