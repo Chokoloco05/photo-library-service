@@ -6,6 +6,8 @@
 
 Cette étape ajoute GitHub Actions au projet du Milestone 1. Elle utilise le Kubernetes **kubeadm de Docker Desktop**, le contrôleur Traefik existant et un namespace `test` séparé de `dev`.
 
+**Pipeline déjà exécuté avec succès :** [premier run GitHub](https://github.com/Chokoloco05/photo-library-service/actions/runs/38407265367). Le [compte rendu de validation](docs/validation-milestone2.md) rassemble les preuves locales et GitHub.
+
 ## 1. Ce qui est fourni
 
 | Fichier | Rôle |
@@ -100,11 +102,9 @@ Les tests ne nécessitent pas Docker ou Kubernetes. Un échec retourne un code d
 
 ## 5. Créer et connecter le dépôt GitHub
 
-Compte prévu : **Chokoloco05**. Dépôt prévu : **photo-library-service**.
+Le dépôt privé **[Chokoloco05/photo-library-service](https://github.com/Chokoloco05/photo-library-service)** existe et le projet y a été poussé sur `main`. `origin` est déjà configuré sur ce PC. Donner au professeur l'accès nécessaire à l'évaluation.
 
-Tant que la création du dépôt distant n'a pas été confirmée, cette URL reste la destination prévue, pas une preuve de publication : `https://github.com/Chokoloco05/photo-library-service`.
-
-Sur GitHub, créer un dépôt nommé `photo-library-service`. Pour cette installation avec un runner ayant accès au PC, utiliser un dépôt **privé**, puis donner au professeur l'accès nécessaire à l'évaluation. Le créer vide, sans génération de README, licence ou `.gitignore`, puisque ces fichiers sont gérés localement.
+Les vérifications ci-dessous servent aussi à préparer une nouvelle copie du projet. Il n'est pas nécessaire de recréer le dépôt.
 
 Le dossier du projet doit avoir son propre dépôt Git. Vérifier :
 
@@ -132,6 +132,16 @@ Si Git demande une identité lors du premier commit, configurer **dans ce dépô
 Installer le runner comme expliqué ci-dessous avant le premier push de démonstration. Si un push a déjà été fait sans runner disponible, le second job peut attendre dans la file ; il pourra démarrer lorsque le runner sera en ligne.
 
 ## 6. Installer le runner Windows une fois
+
+**Sur ce PC, cette installation est déjà faite :** runner officiel `v2.338.0`, installé dans `C:\actions-runner`, enregistré sous le nom `photo-desktop` avec le label `photo-local`. Son archive a été vérifiée par SHA256. Il a été lancé en arrière-plan, sans service Windows et sans démarrage automatique à l'ouverture de session.
+
+Vérifier son état depuis le projet :
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Status
+```
+
+Ne pas lancer une seconde instance avec `run.cmd` lorsqu'il est déjà actif. La procédure suivante concerne une nouvelle machine ou une réinstallation.
 
 Dans le dépôt GitHub :
 
@@ -243,12 +253,17 @@ kubectl --context docker-desktop scale deployment/photo-service --replicas=3 -n 
 kubectl --context docker-desktop rollout status deployment/photo-service -n test --timeout=180s
 ```
 
-Pour arrêter le runner interactif, attendre la fin du run en cours puis faire **Ctrl+C** dans son terminal. Pour le relancer :
+Le runner de ce PC tourne en arrière-plan. Depuis le dossier du projet, utiliser :
 
 ```powershell
-cd C:\actions-runner
-.\run.cmd
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Status
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Stop
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Start
 ```
+
+Choisir la commande correspondant à l'action souhaitée. L'arrêt est refusé si un job est en cours. Arrêter le runner ne supprime pas les Pods et n'arrête pas l'application.
+
+Après un redémarrage du PC, démarrer Docker Desktop, attendre Kubernetes, puis exécuter `-Action Start`. Si le runner a été lancé manuellement dans un terminal avec `run.cmd`, **Ctrl+C** dans ce terminal permet aussi de l'arrêter après la fin du job.
 
 Un prochain push remettra Test à trois répliques si le runner est disponible. Ne pas lancer de répétition locale en parallèle d'un pipeline GitHub : les deux modifieraient le même Deployment.
 
@@ -258,13 +273,14 @@ Un prochain push remettra Test à trois répliques si le runner est disponible. 
 | --- | --- |
 | Aucun workflow après le push | Fichier sous `.github/workflows/`, branche `main`, Actions autorisées dans le dépôt. |
 | Job de déploiement `Skipped` | Vérifier les tests ; une pull request ne déploie pas, et le lancement manuel doit viser `main`. |
-| Job `Queued` / attente d'un runner | Terminal `run.cmd` ouvert, runner Idle, labels Windows/X64/photo-local. |
+| Job `Queued` / attente d'un runner | Lancer `scripts/github-runner.ps1 -Action Start`, vérifier le statut Idle et les labels Windows/X64/photo-local. |
 | `Waiting for approval` | Vérifier les protections de l'environnement GitHub `test`. |
 | Docker ou contexte Kubernetes introuvable | Runner lancé sous le même utilisateur Windows, Docker Desktop actif. |
 | Erreur de runtime d'une action | Mettre à jour le runner avec la version fournie par GitHub. |
 | `ErrImageNeverPull` | L'image doit être construite dans `desktop-linux` sur le même PC que le cluster kubeadm. |
 | `must-be-rendered` dans les Pods | Le manifeste brut a été appliqué ; repasser par `deploy-test.ps1` avec l'image construite. |
 | JSON `environment: dev` | Utiliser le host `photo-test.local`, pas la route `localhost` de Dev. |
+| HTTP 404 juste après le redémarrage de Docker Desktop | Attendre que Kubernetes et Traefik aient rétabli leurs connexions, puis réessayer. Vérifier les logs du contrôleur si cela persiste. |
 | Rollout expiré | Lire les événements et probes ; le job échoue, il ne déclare pas la mise à jour réussie. |
 
 ```powershell

@@ -7,6 +7,8 @@ Application Node.js/Express sans base de données, répliquée en trois Pods, ac
 
 **Milestone 2 (20 octobre) :** suivre [MILESTONE-2.md](MILESTONE-2.md) pour les tests automatiques, GitHub Actions et le déploiement dans `test`. Le guide ci-dessous conserve le parcours **Dev / Milestone 1**. Les commandes de lancement et d'arrêt de Dev sont regroupées dans [LANCEMENT-ARRET.md](LANCEMENT-ARRET.md).
 
+Le [premier pipeline GitHub complet](https://github.com/Chokoloco05/photo-library-service/actions/runs/38407265367) a réussi. L'environnement **Test** est accessible sur **http://test.localhost/** lorsque Docker Desktop et Kubernetes sont démarrés.
+
 ## 1. Environnement utilisé
 
 Cette procédure cible le cluster déjà visible dans Docker Desktop : **kubeadm, un nœud `docker-desktop`, Kubernetes v1.36.1**. Docker et Kubernetes doivent être démarrés, avec des conteneurs Linux. Aucun cluster k3d ni installation de Helm n'est nécessaire.

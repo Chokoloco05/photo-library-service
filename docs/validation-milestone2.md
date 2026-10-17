@@ -1,4 +1,19 @@
-# Validation du Milestone 2 — 13 octobre 2026
+# Validation du Milestone 2 — 13 et 18 octobre 2026
+
+## Pipeline GitHub confirmé
+
+Le 18 octobre, la vérification de GitHub Actions a confirmé la réussite du premier pipeline, exécuté le 13 octobre après un vrai push sur `main`.
+
+- Dépôt privé : [Chokoloco05/photo-library-service](https://github.com/Chokoloco05/photo-library-service).
+- Run : [38407265367 — succès](https://github.com/Chokoloco05/photo-library-service/actions/runs/38407265367).
+- Commit : `b4115eb555f97fe336395d92f1220a305bc32827`.
+- Job **Unit and HTTP tests** : réussi sur le runner hébergé GitHub.
+- Job **Build image and roll out to Test** : réussi sur le runner Windows `photo-desktop`.
+- Ce second job a construit l'image puis exécuté le rollout et le contrôle HTTP qui exige `environment: test` et la révision exacte du commit.
+
+Le journal du runner confirme également : `Job Build image and roll out to Test completed with result: Succeeded`.
+
+Les prochains runs, notamment les mises à jour de version, sont accessibles dans [l'historique Actions du dépôt](https://github.com/Chokoloco05/photo-library-service/actions). Pour chacun, le résumé indique le commit et l'image déployée. Comparer cette révision au JSON servi par `http://test.localhost/`.
 
 ## Périmètre réellement vérifié
 
@@ -43,12 +58,10 @@ Les six requêtes de contrôle ont observé les trois nouveaux Pods : `photo-ser
 
 Ces deux images ont le même code applicatif et une révision de build différente : cela vérifie le remplacement des Pods lors d'un changement d'image. Le guide fournit en complément la démonstration d'une nouvelle version applicative par `npm version patch` puis push Git.
 
-## Éléments restant à valider sur GitHub
+## Conditions de reproduction
 
-Au moment de cette validation, GitHub n'est pas connecté à la session et aucun navigateur connecté n'est accessible. La création distante de `Chokoloco05/photo-library-service`, l'enregistrement du runner et un run déclenché par un vrai push **ne sont pas confirmés**.
+Le dépôt distant existe, le runner est enregistré et le premier push a exécuté toute la chaîne avec succès. Le runner est installé dans `C:\actions-runner`, sous le nom `photo-desktop`, avec le label `photo-local`.
 
-Le projet possède son propre dépôt Git local. Le workflow est prêt, mais **le Milestone 2 n'est pas complètement démontré tant qu'un push réel n'a pas exécuté la chaîne dans GitHub Actions**.
-
-Après connexion, conserver le lien du run réussi et son SHA, puis vérifier que le champ `revision` servi par Test correspond à ce SHA. Remplacer ou compléter ce compte rendu avec ces preuves.
+Après un redémarrage du PC, démarrer Docker Desktop, attendre Kubernetes, puis lancer `scripts/github-runner.ps1 -Action Start`. Le runner ne démarre pas automatiquement avec Windows. Un push ne peut être déployé que lorsque ce runner et le cluster sont disponibles.
 
 Aucune mesure continue de disponibilité n'a été effectuée pendant le rollout ; cette validation ne constitue pas une preuve de zéro downtime pour la soutenance finale.
