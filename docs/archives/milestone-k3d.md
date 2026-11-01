@@ -1,3 +1,5 @@
+> Archive : parcours alternatif k3d, non utilis? pour le cluster Docker Desktop actuel.
+
 # Photo Library Service — Milestone 1
 
 **Cours :** Distributed Systems / Scalable Infrastructure — Prof. Quentin Lurkin  

@@ -21,6 +21,7 @@ try {
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'get', 'ingressclass', 'traefik', '--request-timeout=15s')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'rollout', 'status', 'deployment/traefik', '-n', 'photo-ingress', '--timeout=60s')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'k8s/test/00-namespace.yaml')
+    & .\scripts\database.ps1 -Namespace test
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'k8s/test/02-service.yaml')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'k8s/test/03-ingress.yaml')
 
@@ -36,7 +37,7 @@ try {
         $responses = @()
         try {
             foreach ($sample in 1..6) {
-                $raw = & curl.exe --noproxy '*' --fail --silent --show-error --max-time 5 -H 'Host: photo-test.local' -H 'Connection: close' http://127.0.0.1/
+                $raw = & curl.exe --noproxy '*' --fail --silent --show-error --max-time 5 -H 'Host: photo-test.local' -H 'Connection: close' http://127.0.0.1/api/info
                 if ($LASTEXITCODE -ne 0) { throw 'HTTP request failed.' }
                 $body = ($raw -join "`n") | ConvertFrom-Json
                 if ($body.environment -ne 'test' -or $body.revision -ne $ExpectedRevision) {

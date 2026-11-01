@@ -1,0 +1,19 @@
+# Local development only; Kubernetes uses generated per-environment Secrets.
+services:
+  database:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: photo_service
+      POSTGRES_USER: photo
+      POSTGRES_PASSWORD: ${PGPASSWORD:-photo_local_dev}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - photo-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U photo -d photo_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  photo-data:

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173f36">
+  <title>Clair — Votre photothèque, allégée</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/library.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Clair, accueil"><span class="brand-mark" aria-hidden="true">◈</span> clair<span class="brand-dot">.</span></a>
+    <span class="top-caption">UNE PLACE POUR VOS SOUVENIRS</span>
+    <span id="environment" class="environment">Connexion…</span>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">LAISSEZ RESPIRER VOS PHOTOS</p><h1>Gardez l’essentiel.<br><span>Retrouvez de la place.</span></h1><p class="intro-copy">Rassemblez vos images, repérez les doublons et comparez les versions. Vous choisissez ce qui mérite de rester.</p></div>
+      <div class="intro-actions"><button id="import-button" class="button primary"><span aria-hidden="true">＋</span> Ajouter des photos</button><p>JPEG, PNG ou WebP · 10 Mo par photo</p></div>
+    </section>
+    <section class="stats" aria-label="Résumé de la bibliothèque">
+      <div class="stat"><span class="stat-icon" aria-hidden="true">▧</span><div><p>Photos dans la bibliothèque</p><strong id="photo-count">—</strong></div></div>
+      <div class="stat"><span class="stat-icon" aria-hidden="true">◴</span><div><p>Poids des originaux</p><strong id="total-bytes">—</strong></div></div>
+      <div class="stat accent"><span class="stat-icon" aria-hidden="true">↗</span><div><p>Espace récupérable</p><strong id="reclaimable">—</strong><small>en gardant une copie de chaque doublon exact</small></div></div>
+    </section>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section id="dropzone" class="dropzone" aria-label="Importer des photos">
+      <span class="drop-icon" aria-hidden="true">↥</span><div><strong>Un peu de place pour de nouveaux souvenirs.</strong><p>Glissez vos photos ici, ou <button id="browse-button" class="text-button">parcourez vos fichiers</button>.</p></div><span class="drop-detail">Originaux conservés · 24 Mpx maximum</span>
+      <input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+    </section>
+    <section class="library" aria-label="Photothèque">
+      <div class="library-header"><div class="tabs" role="tablist" aria-label="Vue de la bibliothèque">
+        <button id="tab-library" role="tab" aria-selected="true" aria-controls="results" data-view="library">Bibliothèque <span id="library-badge">0</span></button>
+        <button id="tab-duplicates" role="tab" aria-selected="false" aria-controls="results" data-view="duplicates" tabindex="-1">Doublons exacts</button>
+        <button id="tab-similar" role="tab" aria-selected="false" aria-controls="results" data-view="similar" tabindex="-1">Images proches</button>
+      </div><button id="refresh" class="text-button refresh">↻ Actualiser</button></div>
+      <div class="toolbar"><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Rechercher une photo…" aria-label="Rechercher par titre ou nom"></label><label class="sort-label">Trier par <select id="sort"><option value="newest">Plus récentes</option><option value="size">Plus volumineuses</option><option value="name">Nom de fichier</option></select></label></div>
+      <p id="view-description" class="view-description">Vos originaux, au même endroit. Sélectionnez deux photos pour les comparer.</p>
+      <div id="results" role="tabpanel" aria-labelledby="tab-library" aria-busy="true"><div class="empty"><span class="empty-icon">◌</span><h2>Chargement de la bibliothèque…</h2></div></div>
+    </section>
+    <aside id="selection-bar" class="selection-bar" aria-label="Photos sélectionnées" hidden><span id="selection-count"></span><button id="clear-selection" class="text-button">Annuler</button><button id="compare-button" class="button primary" disabled>Comparer les deux photos →</button></aside>
+    <footer><span><strong>clair.</strong> Moins de doublons. Plus de souvenirs.</span><span id="version">Photo Library Service</span></footer>
+  </main>
+  <dialog id="compare-dialog" aria-labelledby="compare-title"><div class="dialog-header"><div><p class="eyebrow">PRENDRE LE TEMPS DE CHOISIR</p><h2 id="compare-title">Comparer les photos</h2></div><button class="close-button" data-close="compare-dialog" aria-label="Fermer la comparaison">✕</button></div><p class="dialog-note">Comparez le cadrage, la résolution et le poids. Aucune photo n’est supprimée automatiquement.</p><div id="compare-content" class="compare-grid"></div></dialog>
+  <dialog id="edit-dialog" aria-labelledby="edit-title"><form id="edit-form"><div class="dialog-header"><h2 id="edit-title">Les détails du souvenir</h2><button type="button" class="close-button" data-close="edit-dialog" aria-label="Fermer les détails">✕</button></div><label>Titre<input id="photo-title" name="title" required maxlength="200"></label><label>Description<textarea id="photo-description" name="description" maxlength="1000" rows="4" placeholder="Un lieu, une date, une histoire…"></textarea></label><p id="edit-error" class="error" role="alert"></p><button type="submit" class="button primary">Enregistrer les détails</button></form></dialog>
+</body>
+</html>

@@ -20,6 +20,20 @@ jobs:
     name: Unit and HTTP tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_USER: photo
+          POSTGRES_PASSWORD: integration_only
+          POSTGRES_DB: photo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U photo -d photo_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://photo:integration_only@localhost:5432/photo_test
     steps:
       - uses: actions/checkout@v7
         with:

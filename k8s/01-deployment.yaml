@@ -7,6 +7,13 @@ metadata:
     app: photo-service
 spec:
   replicas: 3
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: photo-service
@@ -18,12 +25,27 @@ spec:
       terminationGracePeriodSeconds: 25
       containers:
         - name: photo-service
-          image: photo-service:v1.0.0
+          image: photo-service:v2.0.0
           imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command: [sh, -c, sleep 5]
           ports:
             - name: http
               containerPort: 3000
           env:
+            - name: PGHOST
+              value: photo-db
+            - name: PGDATABASE
+              value: photo_service
+            - name: PGUSER
+              value: photo
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: photo-db
+                  key: password
             - name: APP_ENV
               value: dev
             - name: POD_NAME
@@ -37,18 +59,24 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 64Mi
+              memory: 96Mi
             limits:
               cpu: 500m
-              memory: 128Mi
+              memory: 384Mi
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /readyz
               port: http
             initialDelaySeconds: 2
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 2
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 60
           livenessProbe:
             httpGet:
               path: /healthz

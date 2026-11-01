@@ -1,0 +1,76 @@
+# Namespace is supplied by scripts/database.ps1, separately for Dev and Test.
+apiVersion: v1
+kind: Service
+metadata:
+  name: photo-db
+spec:
+  clusterIP: None
+  selector:
+    app: photo-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: photo-db
+spec:
+  serviceName: photo-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: photo-db
+  template:
+    metadata:
+      labels:
+        app: photo-db
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: postgres
+          image: postgres:17.6-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: photo_service
+            - name: POSTGRES_USER
+              value: photo
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: photo-db
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, photo, -d, photo_service]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, photo, -d, photo_service]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi

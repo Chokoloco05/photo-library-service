@@ -1,3 +1,5 @@
+> Mise à jour v2 : le guide ci-dessous décrit le jalon initial. La version actuelle ajoute une photothèque et PostgreSQL : suivre le [guide de l’application](application.md) pour l’installation et les limites actuelles.
+
 # Milestone 2 — Push Git → tests → image → rollout dans Test
 
 **Échéance : 20 octobre 2026 — 5 points.**
@@ -6,18 +8,18 @@
 
 Cette étape ajoute GitHub Actions au projet du Milestone 1. Elle utilise le Kubernetes **kubeadm de Docker Desktop**, le contrôleur Traefik existant et un namespace `test` séparé de `dev`.
 
-**Pipeline déjà exécuté avec succès :** [premier run GitHub](https://github.com/Chokoloco05/photo-library-service/actions/runs/38407265367). Le [compte rendu de validation](docs/validation-milestone2.md) rassemble les preuves locales et GitHub.
+**Pipeline déjà exécuté avec succès :** [premier run GitHub](https://github.com/Chokoloco05/photo-library-service/actions/runs/38407265367). Le [compte rendu de validation](validation-milestone2.md) rassemble les preuves locales et GitHub.
 
 ## 1. Ce qui est fourni
 
 | Fichier | Rôle |
 | --- | --- |
-| [.github/workflows/test-pipeline.yml](.github/workflows/test-pipeline.yml) | Pipeline déclenché par un push sur `main` |
-| [test/identity.test.js](test/identity.test.js) | Quatre tests unitaires de l'identité, des valeurs de repli et de l'isolation entre instances |
-| [test/http.test.js](test/http.test.js) | Quatre tests HTTP des endpoints et erreurs |
-| [k8s/test/](k8s/test/) | Namespace, Deployment à trois répliques, Service et Ingress de Test |
-| [scripts/deploy-test.ps1](scripts/deploy-test.ps1) | Application de l'image attendue, attente du rollout et contrôle HTTP de la révision |
-| [scripts/check-milestone2.ps1](scripts/check-milestone2.ps1) | Répétition locale : tests, build et déploiement |
+| [.github/workflows/test-pipeline.yml](../.github/workflows/test-pipeline.yml) | Pipeline déclenché par un push sur `main` |
+| [test/identity.test.js](../test/identity.test.js) | Quatre tests unitaires de l'identité, des valeurs de repli et de l'isolation entre instances |
+| [test/http.test.js](../test/http.test.js) | Quatre tests HTTP des endpoints et erreurs |
+| [k8s/test/](../k8s/test) | Namespace, Deployment à trois répliques, Service et Ingress de Test |
+| [scripts/deploy-test.ps1](../scripts/deploy-test.ps1) | Application de l'image attendue, attente du rollout et contrôle HTTP de la révision |
+| [scripts/check-milestone2.ps1](../scripts/check-milestone2.ps1) | Répétition locale : tests, build et déploiement |
 
 La base de données, le cache, les migrations et la promotion vers Production seront traités aux étapes suivantes. Ils ne font pas partie de l'énoncé du jalon du 20 octobre.
 
@@ -240,32 +242,7 @@ Le Deployment utilise `RollingUpdate`, `maxUnavailable: 0`, `maxSurge: 1` et une
 
 ## 10. Arrêt et relance
 
-Arrêter uniquement l'application de Test :
-
-```powershell
-kubectl --context docker-desktop scale deployment/photo-service --replicas=0 -n test
-```
-
-Relancer Test sans nouveau build :
-
-```powershell
-kubectl --context docker-desktop scale deployment/photo-service --replicas=3 -n test
-kubectl --context docker-desktop rollout status deployment/photo-service -n test --timeout=180s
-```
-
-Le runner de ce PC tourne en arrière-plan. Depuis le dossier du projet, utiliser :
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Status
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Stop
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Start
-```
-
-Choisir la commande correspondant à l'action souhaitée. L'arrêt est refusé si un job est en cours. Arrêter le runner ne supprime pas les Pods et n'arrête pas l'application.
-
-Après un redémarrage du PC, démarrer Docker Desktop, attendre Kubernetes, puis exécuter `-Action Start`. Si le runner a été lancé manuellement dans un terminal avec `run.cmd`, **Ctrl+C** dans ce terminal permet aussi de l'arrêter après la fin du job.
-
-Un prochain push remettra Test à trois répliques si le runner est disponible. Ne pas lancer de répétition locale en parallèle d'un pipeline GitHub : les deux modifieraient le même Deployment.
+Les commandes sont dans [LANCEMENT-ARRET-TEST.md](lancement-test.md).
 
 ## 11. Dépannage
 
@@ -300,4 +277,4 @@ Un échec ne lance pas de rollback automatique. Après diagnostic, corriger et p
 - Le JSON exposé par l'Ingress, dont `revision` correspond au SHA poussé.
 - Un second push de mise à jour et un nouveau rollout réussi.
 
-Le succès d'un script local ne remplace pas la preuve du déclenchement par GitHub. Le [compte rendu de validation](docs/validation-milestone2.md) distingue ces deux niveaux.
+Le succès d'un script local ne remplace pas la preuve du déclenchement par GitHub. Le [compte rendu de validation](validation-milestone2.md) distingue ces deux niveaux.

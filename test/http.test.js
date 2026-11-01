@@ -27,13 +27,18 @@ test('GET / exposes the deployed version, revision and serving Pod', async () =>
   assert.equal(body.revision, 'commit-123');
   assert.equal(body.pod, 'pod-http');
   assert.equal(body.environment, 'test');
-  assert.equal(body.photos[0].id, 'demo-1');
+  assert.deepEqual(body.photos, []);
 });
 
 test('health endpoint returns HTTP 200 without external dependencies', async () => {
   const response = await fetch(`${baseUrl}/healthz`);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: 'ok' });
+});
+
+test('readiness and library explicitly fail when the database is unavailable', async () => {
+  assert.equal((await fetch(`${baseUrl}/readyz`)).status, 503);
+  assert.equal((await fetch(`${baseUrl}/api/photos`)).status, 503);
 });
 
 test('whoami has one Pod name per line for balancing demonstrations', async () => {

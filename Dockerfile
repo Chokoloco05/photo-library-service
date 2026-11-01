@@ -12,7 +12,9 @@ ENV APP_REVISION=${APP_REVISION}
 LABEL org.opencontainers.image.revision=${APP_REVISION}
 WORKDIR /app
 COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
-COPY --chown=node:node package.json app.js identity.js server.js ./
+COPY --chown=node:node package.json app.js identity.js server.js database.js photos.js migrate.js ./
+COPY --chown=node:node public ./public
+COPY --chown=node:node migrations ./migrations
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]
