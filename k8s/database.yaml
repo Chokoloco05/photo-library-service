@@ -56,16 +56,27 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+          # Allow recovery after Docker Desktop restarts before running liveness.
+          startupProbe:
+            exec:
+              command: [pg_isready, -U, photo, -d, photo_service, -t, "3"]
+            timeoutSeconds: 5
+            periodSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             exec:
-              command: [pg_isready, -U, photo, -d, photo_service]
+              command: [pg_isready, -U, photo, -d, photo_service, -t, "3"]
             initialDelaySeconds: 5
+            timeoutSeconds: 5
             periodSeconds: 5
+            failureThreshold: 3
           livenessProbe:
             exec:
-              command: [pg_isready, -U, photo, -d, photo_service]
+              command: [pg_isready, -U, photo, -d, photo_service, -t, "3"]
             initialDelaySeconds: 30
+            timeoutSeconds: 5
             periodSeconds: 10
+            failureThreshold: 6
   volumeClaimTemplates:
     - metadata:
         name: data

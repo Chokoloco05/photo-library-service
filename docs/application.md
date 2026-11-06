@@ -61,6 +61,12 @@ Le script construit `photo-service:v2.0.0`, installe la base Dev si nécessaire,
 
 Les données survivent aux redémarrages des Pods. Ne pas supprimer les PVC ou les namespaces pour arrêter l’application. Les guides [Dev](lancement-dev.md) et [Test](lancement-test.md) permettent d’arrêter uniquement les Pods applicatifs ; la base reste démarrée.
 
+## Sondes PostgreSQL après redémarrage de Docker Desktop
+
+Les sondes de la base accordent cinq secondes à la commande `pg_isready`, avec un délai interne de trois secondes. Une startup probe laisse environ trois minutes à PostgreSQL pour récupérer avant d’activer les sondes de fonctionnement. La liveness attend six échecs consécutifs avant un redémarrage.
+
+Sans `timeoutSeconds` explicite, le délai Kubernetes était d’une seconde : un ralentissement local pouvait provoquer des faux négatifs et des redémarrages. Les événements historiques `Unhealthy`, `BackOff` ou `FailedSync` peuvent rester visibles après résolution. Vérifier l’état courant Ready et l’âge du dernier événement plutôt que seulement sa présence dans la liste.
+
 ## Développer sans Kubernetes
 
 Avec Docker Desktop et Node.js 22 ou ultérieur :
