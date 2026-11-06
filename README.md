@@ -1,51 +1,48 @@
-# Photo Library Service
+# Photo Library Service — Clair
 
-Projet 2026A : service de photothèque et infrastructure Kubernetes locale sur **Docker Desktop**, avec Traefik comme contrôleur Ingress et GitHub Actions pour la CI/CD.
+Projet 2026A : une photothèque web avec import, recherche, détection des doublons et comparaison des photos, basée sur Node.js/Express et PostgreSQL.
 
-## État du projet
+## Démarrer et étudier
 
-| Échéance | Attendu | Éléments présents dans le dépôt |
-| --- | --- | --- |
-| 13 octobre — milestone 1 | Application répliquée et accessible par Ingress | Express, trois Pods dans `dev`, Service et Ingress |
-| 20 octobre — milestone 2 | Push → tests → image → rollout en Test | Tests Node.js, workflow GitHub Actions, scripts de déploiement et compte rendu de validation |
-| 3 novembre — milestone 3 | Surveiller les services et les dimensionner depuis un dashboard | Headlamp et Metrics Server installés ; scaling 3 → 5 → 3 validé dans le navigateur. Voir le [guide du milestone 3](docs/milestone-3.md) |
-| 17 novembre — évaluation finale | Pipeline complet, base de données, cache, monitoring et documentation | Travaux restants détaillés dans le plan |
+| Document | Contenu |
+| --- | --- |
+| [Application](docs/application.md) | Lancement et arrêt, fonctionnalités, API, base et migrations |
+| [Infrastructure](docs/infrastructure.md) | Architecture locale, trois milestones, CI/CD, dashboard, scaling et dépannage |
+| [Cluster de l’école](docs/ecole.md) | Connexion, registre privé, namespace `team5`, Dev/Test/Production et limites actuelles |
+| [Validations](docs/validation.md) | Comptes rendus datés, captures et résultats des tests |
+| [Banque de révision](docs/banque-questions-revision.md) | 88 questions pour comprendre le projet et préparer l’oral |
 
-La présence des fichiers ne remplace pas une validation du cluster en fonctionnement. L’application est désormais **Clair**, une photothèque avec import, recherche, doublons, comparaison et PostgreSQL persistant. Voir le [guide de l’application](docs/application.md).
+Le [support PDF de code](output/pdf/photo-service-support-etude-code.pdf) reste disponible pour étudier. C’est un instantané du 1er novembre ; les guides ci-dessus décrivent les évolutions plus récentes.
 
-## Démarrer
+## État vérifié au 6 novembre 2026
 
-Démarrer Docker Desktop avec Kubernetes, puis suivre le guide [lancement Dev](docs/lancement-dev.md) ou [lancement Test](docs/lancement-test.md).
+- Les trois milestones disposent de preuves locales : application répliquée via Traefik, pipeline Test et scaling depuis Headlamp.
+- Le [dernier pipeline GitHub](https://github.com/Chokoloco05/photo-library-service/actions/runs/42245846705) est réussi : tests, build/rollout Test local et publication privée GHCR.
+- À l’école, Dev/Test/Production sont déployés dans `team5` : neuf Pods applicatifs et trois bases indépendantes. Les tests internes passent ; l’accès web externe reste bloqué par la résolution DNS du domaine.
+- Restent notamment la réplication et le sharding PostgreSQL, le cache répliqué, le rafraîchissement de Test, la promotion Production, la preuve sans interruption et le transfert complet du pipeline et du dashboard vers l’école.
+
+## Accès locaux
+
+Avec Docker Desktop et Kubernetes démarrés, suivre le [lancement](docs/application.md#lancement-et-arret).
 
 - Dev : http://localhost/
-- Test : http://test.localhost/ (après déploiement Test)
-- Dashboard : http://dashboard.localhost/ — [connexion et démonstration](docs/milestone-3.md).
-- Tests locaux : `npm.cmd ci`, puis `npm.cmd run check` et `npm.cmd test`.
+- Test : http://test.localhost/
+- Headlamp : http://dashboard.localhost/ — [connexion et scaling](docs/infrastructure.md#monitoring-et-milestone-3).
 
-## Documentation
-
-- [Application : fonctionnalités, PostgreSQL, migrations et API](docs/application.md)
-- [Validation de la photothèque](docs/validation-application.md)
-
-- [Milestone 1 : cluster local, Ingress, réplication et dépannage](docs/milestone-1.md)
-- [Milestone 2 : CI/CD et runner GitHub](docs/milestone-2.md)
-- [Preuves de validation du milestone 2](docs/validation-milestone2.md)
-- [Milestone 3 : dashboard, métriques et scaling](docs/milestone-3.md)
-- [Questions de révision](docs/banque-questions-revision.md)
-- [Archive du parcours alternatif k3d](docs/archives/milestone-k3d.md)
-
-## Organisation
+## Structure du dépôt
 
 | Emplacement | Rôle |
 | --- | --- |
-| `app.js`, `server.js`, `identity.js` | Application Express et identité du Pod |
-| `public/`, `photos.js` | Interface et analyse des images |
+| `app.js`, `server.js`, `identity.js`, `photos.js` | Serveur, identité des Pods et traitement des photos |
+| `public/` | Interface HTML, CSS et JavaScript |
 | `database.js`, `migrations/` | PostgreSQL et migrations versionnées |
-| `test/` | Tests unitaires et HTTP |
-| `k8s/` | Manifestes Dev et namespaces ; `k8s/test/` pour Test |
-| `infra/` | Contrôleur Ingress partagé et monitoring |
+| `test/` | Tests unitaires et d’intégration |
+| `k8s/` | Ressources applicatives Kubernetes |
+| `infra/` | Contrôleur Ingress et monitoring |
 | `.github/workflows/` | Pipeline GitHub Actions |
-| `scripts/` | Lancement, déploiement, runner et vérifications |
-| `docs/` | Guides et preuves ; `archives/` pour l'alternative k3d |
+| `scripts/` | Lancement, déploiement et vérifications |
+| `school_cluster/` | Template de route et configuration locale confidentielle ignorée par Git |
+| `docs/`, `docs/evidence/` | Cinq guides et leurs preuves |
+| `output/pdf/` | Support d’étude |
 
-`node_modules/` et `.npm-cache/` sont des fichiers locaux ignorés par Git. `package-lock.json` doit être conservé pour reproduire les installations. Les manifestes Dev et Test restent séparés pour préserver le pipeline existant.
+`node_modules/` et `.npm-cache/` sont des fichiers locaux ignorés par Git. Conserver `package-lock.json` pour reproduire les installations. Ne pas supprimer les PVC pour arrêter l’application : ils contiennent les photos.

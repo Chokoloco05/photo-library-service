@@ -1,0 +1,53 @@
+{
+  "date": "2026-11-06",
+  "namespace": "team5",
+  "commit": "3bd43258367891d12bb35b8638bf7de027862fdc",
+  "image": "ghcr.io/chokoloco05/photo-library-service@sha256:9e74831ffb5e45df279bfe45740e49fd531a742967e3ed3dbcfa98db85dc0029",
+  "environments": [
+    {
+      "environment": "dev",
+      "revision": "3bd43258367891d12bb35b8638bf7de027862fdc",
+      "ready": true,
+      "upload_download_identical": true,
+      "exact_duplicates": true,
+      "database_isolation": true
+    },
+    {
+      "environment": "test",
+      "revision": "3bd43258367891d12bb35b8638bf7de027862fdc",
+      "ready": true,
+      "upload_download_identical": true,
+      "exact_duplicates": true,
+      "database_isolation": true
+    },
+    {
+      "environment": "prod",
+      "revision": "3bd43258367891d12bb35b8638bf7de027862fdc",
+      "ready": true,
+      "upload_download_identical": true,
+      "exact_duplicates": true,
+      "database_isolation": true
+    }
+  ],
+  "route_conditions": [
+    {
+      "lastTransitionTime": "2026-11-06T15:48:42Z",
+      "message": "Route is accepted",
+      "observedGeneration": 1,
+      "reason": "Accepted",
+      "status": "True",
+      "type": "Accepted"
+    },
+    {
+      "lastTransitionTime": "2026-11-06T15:48:42Z",
+      "message": "Resolved all the Object references for the Route",
+      "observedGeneration": 1,
+      "reason": "ResolvedRefs",
+      "status": "True",
+      "type": "ResolvedRefs"
+    }
+  ],
+  "public_dns_status": "NXDOMAIN (Cloudflare DNS Status 3)",
+  "dns_from_cluster": "unresolved",
+  "pipeline": "https://github.com/Chokoloco05/photo-library-service/actions/runs/42245846705"
+}

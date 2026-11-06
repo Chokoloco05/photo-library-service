@@ -6,7 +6,7 @@ $runnerRoot = 'C:\actions-runner'
 $listenerPath = Join-Path $runnerRoot 'bin\Runner.Listener.exe'
 $workerPath = Join-Path $runnerRoot 'bin\Runner.Worker.exe'
 if (-not (Test-Path -LiteralPath (Join-Path $runnerRoot '.runner'))) {
-    throw 'Runner is not configured. Follow MILESTONE-2.md first.'
+    throw 'Runner is not configured. Follow docs/infrastructure.md first.'
 }
 $listener = @(Get-CimInstance Win32_Process -Filter "Name='Runner.Listener.exe'" | Where-Object { $_.ExecutablePath -eq $listenerPath })
 $workers = @(Get-CimInstance Win32_Process -Filter "Name='Runner.Worker.exe'" | Where-Object { $_.ExecutablePath -eq $workerPath })

@@ -47,7 +47,9 @@ Cette première version utilise **un PostgreSQL par environnement**, avec un Sta
 
 La bibliothèque est partagée, sans comptes utilisateurs ni authentification applicative. Elle convient à la démonstration locale ; prévoir le contrôle d’accès et HTTPS avant d’y déposer des photos privées sur un domaine public.
 
-## Lancer sur Kubernetes local
+<a id="lancement-et-arret"></a>
+
+## Lancement et arrêt sur Kubernetes local
 
 Dev, depuis la racine du projet avec Docker Desktop et Kubernetes démarrés :
 
@@ -59,7 +61,25 @@ Le script construit `photo-service:v2.0.0`, installe la base Dev si nécessaire,
 
 `scripts/database.ps1` crée un mot de passe aléatoire par environnement dans le Secret Kubernetes `photo-db`. Il conserve le Secret existant à chaque lancement. Ne pas supprimer ce Secret indépendamment du PVC : le mot de passe du PostgreSQL déjà initialisé ne changerait pas automatiquement.
 
-Les données survivent aux redémarrages des Pods. Ne pas supprimer les PVC ou les namespaces pour arrêter l’application. Les guides [Dev](lancement-dev.md) et [Test](lancement-test.md) permettent d’arrêter uniquement les Pods applicatifs ; la base reste démarrée.
+Les données survivent aux redémarrages des Pods. Ne pas supprimer les PVC ou les namespaces pour arrêter l’application. Pour relancer Test déjà déployé et son runner :
+
+```powershell
+kubectl --context docker-desktop scale deployment/photo-service -n test --replicas=3
+kubectl --context docker-desktop rollout status deployment/photo-service -n test --timeout=180s
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Start
+```
+
+Pour arrêter les applications locales, attendre la fin des jobs GitHub, puis :
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Stop
+kubectl --context docker-desktop scale deployment/photo-service -n dev --replicas=0
+kubectl --context docker-desktop scale deployment/photo-service -n test --replicas=0
+```
+
+Les bases et volumes restent présents. Pour arrêter également les bases et le cluster local, quitter Docker Desktop après l'arrêt du runner ; le cluster de l'école reste indépendant. Au redémarrage, relancer Docker Desktop puis les commandes ci-dessus ou le script Dev.
+
+Pour déployer une nouvelle version en Test, suivre le [pipeline](infrastructure.md#pipeline-github-et-milestone-2). Pour les trois environnements distants et leurs préfixes `/dev/`, `/test/` et `/`, suivre le [guide école](ecole.md).
 
 ## Sondes PostgreSQL après redémarrage de Docker Desktop
 
@@ -113,7 +133,7 @@ npm.cmd test
 
 Les tests d’intégration sont activés quand `TEST_DATABASE_URL` est défini. Ils créent un schéma temporaire isolé et nettoient uniquement ce schéma à la fin. Le workflow GitHub lance PostgreSQL et définit cette variable : les tests de base ne sont donc pas ignorés dans la CI.
 
-Ils vérifient aussi la migration d’une base contenant déjà une photo, l’accès partagé depuis deux instances, les téléchargements à l’identique et les opérations de bibliothèque. Les [preuves de validation](validation-application.md) décrivent aussi les vérifications réalisées sur Kubernetes et dans Chrome.
+Ils vérifient aussi la migration d’une base contenant déjà une photo, l’accès partagé depuis deux instances, les téléchargements à l’identique et les opérations de bibliothèque. Les [preuves de validation](validation.md#application) décrivent aussi les vérifications réalisées sur Kubernetes et dans Chrome.
 
 ## API
 

@@ -5,7 +5,7 @@ Réponses courtes pour réviser à l’oral. ★ = question prioritaire. Les alt
 
 ## Comment utiliser cette banque
 
-État de référence : **31 octobre 2026**, après les trois milestones et l’ajout de la vraie photothèque. Les réponses sont formulées à la première personne pour l’oral. Les validations locales sont documentées ; les points restent attribués par le professeur.
+État de référence : **6 novembre 2026**, après les trois milestones et l’ajout de la vraie photothèque. Les réponses sont formulées à la première personne pour l’oral. Les validations locales sont documentées ; les points restent attribués par le professeur.
 
 - **Milestone 1, 13 octobre :** expliquer le conteneur, les trois répliques, le Service et l’Ingress.
 - **Milestone 2, 20 octobre :** raconter le parcours push → tests → image → rollout dans Test.
@@ -260,7 +260,8 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **58. Question : Qui construit l’image et comment le cluster local la récupère-t-il ? Y a-t-il déjà un registre d’images ?**
 
-**Réponse :** Le runner Windows exécute le build dans Docker Desktop. Sur ce cluster local kubeadm, les images construites sont disponibles pour les Pods ; Test utilise `imagePullPolicy: Never`. Je n’ai pas encore ajouté de registre distant. Pour l’école, il faudra publier l’image dans un registre accessible et adapter le déploiement.
+**Réponse :** Le runner Windows construit l’image utilisée par Test local dans Docker Desktop, avec `imagePullPolicy: Never`. Le pipeline publie aussi une image privée dans GHCR. Le cluster de l’école la télécharge avec le Secret `school-registry` ; ses identifiants ne sont pas enregistrés dans Git.
+
 
 **59. Question : Pourquoi un commit, une version applicative et un tag Docker ne sont-ils pas la même chose ?**
 
@@ -276,7 +277,7 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **62. Question : Quelle preuve ai-je d’un vrai déclenchement GitHub ? La v2 a-t-elle déjà passé le nouveau workflow distant ?**
 
-**Réponse :** Le compte rendu du milestone 2 référence un run GitHub réussi après un vrai push, avec tests, build et déploiement Test. Pour Clair v2 et les nouveaux tests PostgreSQL, j’ai une validation locale et un déploiement local dans Dev/Test. Le nouveau workflow distant reste à déclencher par un push et à vérifier. Je ne confonds pas les preuves des deux versions.
+**Réponse :** Le run GitHub `42245846705` du 6 novembre a réussi : 21 tests, build, rollout Test local et publication de l’image privée GHCR. Les trois environnements école ont ensuite été déployés avec le script. Je distingue ce déploiement manuel du job CI, qui cible encore Docker Desktop.
 
 ## Milestone 3 — Dashboard, métriques et scaling
 
@@ -368,7 +369,8 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **84. Question : Si je passe le StatefulSet PostgreSQL à trois répliques dans Headlamp, ai-je une base répliquée et shardée ?**
 
-**Réponse :** Non. Multiplier les Pods ne configure ni la réplication PostgreSQL ni le partage des données. Actuellement j’ai une base indépendante dans Dev et une autre dans Test, chacune avec une instance. Ce sont deux environnements, pas deux réplicas d’une même base. Le sharding et la réplication restent à implémenter.
+**Réponse :** Non. Multiplier les Pods ne configure ni la réplication PostgreSQL ni le partage des données. Chaque environnement possède sa base indépendante : Dev/Test localement, et Dev/Test/Production dans `team5` à l’école. Ce sont des environnements séparés, pas des réplicas d’une même base. Le sharding et la réplication restent à implémenter.
+
 
 **85. Question : ★ Quelle migration de schéma peux-tu expliquer avec un exemple concret ?**
 
@@ -380,11 +382,12 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **87. Question : L’application est-elle déjà en ligne sur le domaine de l’école ? Le fichier HTTPRoute suffit-il ?**
 
-**Réponse :** Non. Elle est accessible sur mon cluster local. Le kubeconfig donne l’accès à l’API du cluster de l’école ; l’HTTPRoute y expose un Service déjà déployé via leur Gateway. Il faut confirmer l’équipe, publier l’image dans un registre accessible, déployer les ressources et adapter le namespace et la route. Je ne réutilise pas mes scripts locaux sans adapter leur contexte.
+**Réponse :** Les trois environnements sont déployés dans le namespace `team5` à l’école et ont passé les tests internes. La HTTPRoute est acceptée et ses Services sont résolus, mais le domaine renvoie NXDOMAIN depuis les points testés. L’accès web externe attend la configuration DNS ou les indications VPN du professeur. Le kubeconfig donne accès à l’API Kubernetes ; il ne crée pas le DNS.
+
 
 **88. Question : ★ Qu’est-ce que je ne dois pas annoncer comme terminé ?**
 
-**Réponse :** Les trois milestones ont des réalisations et des preuves locales, mais la note dépend de leur présentation et de l’évaluateur. Je n’annonce pas encore de base shardée/répliquée, de cache répliqué, de rafraîchissement Test depuis Production, de promotion Production ou de preuve complète de zéro interruption. Le nouveau workflow v2 doit encore être exécuté sur GitHub après un push.
+**Réponse :** Les trois milestones ont des réalisations et des preuves locales, mais la note dépend de la présentation et de l’évaluateur. Je n’annonce pas encore de base shardée/répliquée, de cache répliqué, de rafraîchissement Test depuis Production, de promotion Production ou de preuve complète sans interruption. Le pipeline GitHub est vert ; son déploiement Test cible encore le cluster local. À l’école, le DNS externe et les permissions du dashboard restent à régler.
 
 ## Trois présentations prêtes pour l’oral
 
@@ -475,12 +478,12 @@ Importer deux fois une photo, ouvrir Doublons exacts, sélectionner les deux cop
 | Service et Ingress Dev | [Service](../k8s/02-service.yaml), [Ingress](../k8s/03-ingress.yaml) |
 | Contrôleur partagé | [Traefik](../infra/docker-desktop/traefik.yaml) |
 | Workflow et rollout Test | [GitHub Actions](../.github/workflows/test-pipeline.yml), [deploy-test.ps1](../scripts/deploy-test.ps1) |
-| Validation du premier pipeline | [Compte rendu milestone 2](validation-milestone2.md) |
+| Validation du premier pipeline | [Compte rendu milestone 2](validation.md#milestone2) |
 | Dashboard et droits | [Headlamp et RBAC](../infra/monitoring/headlamp.yaml) |
 | Collecte et installation | [Metrics Server](../infra/monitoring/metrics-server.yaml), [monitoring.ps1](../scripts/monitoring.ps1) |
-| Captures du scaling | [Validation milestone 3](validation-milestone3.md) |
+| Captures du scaling | [Validation milestone 3](validation.md#milestone3) |
 | Base et schéma | [StatefulSet et PVC](../k8s/database.yaml), [database.js](../database.js), [migration 002](../migrations/002-description.sql) |
-| Photothèque et tests | [Guide applicatif](application.md), [validation applicative](validation-application.md) |
+| Photothèque et tests | [Guide applicatif](application.md), [validation applicative](validation.md#application) |
 
 ## Pièges de vocabulaire à éviter
 
