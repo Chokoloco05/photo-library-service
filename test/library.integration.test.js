@@ -33,10 +33,10 @@ test('PostgreSQL migrations and shared library lifecycle across two application 
     assert.equal(migrated.id, legacy.id); assert.equal(migrated.description, '');
     assert.deepEqual((await otherDatabase.image(legacy.id, false)).data, legacy.original);
     await database.delete(legacy.id);
-    for (const store of [database, otherDatabase]) {
-      const server = createApp({ database: store }).listen(0, '127.0.0.1'); servers.push(server); await once(server, 'listening');
+    for (const [index, store] of [database, otherDatabase].entries()) {
+      const server = createApp({ database: store, basePath: index ? '/test' : '' }).listen(0, '127.0.0.1'); servers.push(server); await once(server, 'listening');
     }
-    const [base, other] = servers.map(server => `http://127.0.0.1:${server.address().port}`);
+    const [base, other] = servers.map((server, index) => `http://127.0.0.1:${server.address().port}${index ? '/test' : ''}`);
     const input = await fixture();
     const upload = async (url, name = 'photo.png', content = input) => fetch(`${url}/api/photos`, {
       method: 'POST', headers: { 'Content-Type': 'image/png', 'X-Filename': encodeURIComponent(name) }, body: content,
@@ -47,6 +47,15 @@ test('PostgreSQL migrations and shared library lifecycle across two application 
       assert.match(response.headers.get('content-type'), /text\/html/);
       assert.match(await response.text(), /Gardez l’essentiel/);
       assert.equal((await fetch(`${base}/readyz`)).status, 200);
+    });
+    await t.test('isolates prefixed UI, assets and API routes for a shared school domain', async () => {
+      const response = await fetch(other, { headers: { Accept: 'text/html' } });
+      const html = await response.text();
+      assert.match(html, /<base href="\/test\/">/);
+      assert.match(html, /href="style.css"/);
+      assert.equal((await fetch(`${other}/style.css`)).status, 200);
+      assert.equal((await fetch(`${other}/api/info`)).status, 200);
+      assert.equal((await fetch(other.replace('/test', '') + '/api/info')).status, 404);
     });
     await t.test('imports exact copies and a recompressed variant through different replicas', async () => {
       let response = await upload(base, 'voyage.png'); assert.equal(response.status, 201); first = await response.json();

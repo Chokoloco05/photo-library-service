@@ -1,6 +1,7 @@
 const express = require('express');
 const { createIdentity } = require('./identity');
 const path = require('node:path');
+const { readFileSync } = require('node:fs');
 const { analyze, duplicates, similar, MAX_BYTES } = require('./photos');
 
 function createApp(options = {}) {
@@ -8,6 +9,10 @@ function createApp(options = {}) {
   const identity = createIdentity(options);
   app.locals.identity = identity;
   const database = options.database;
+  const basePath = (options.basePath ?? (options.env || process.env).APP_BASE_PATH ?? '').replace(/\/$/, '');
+  if (basePath && !/^\/[a-zA-Z0-9/_-]+$/.test(basePath)) throw new Error('Invalid APP_BASE_PATH');
+  const html = readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8')
+    .replace('<base href="/">', `<base href="${basePath}/">`);
   let uploads = 0;
 
   app.disable('x-powered-by');
@@ -27,15 +32,16 @@ function createApp(options = {}) {
   app.use((_req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
     res.set('Referrer-Policy', 'same-origin');
-    res.set('Content-Security-Policy', "default-src 'self'; img-src 'self' blob:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'");
+    res.set('Content-Security-Policy', "default-src 'self'; img-src 'self' blob:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
     next();
   });
   app.get('/api/info', (_req, res) => res.json(identity));
   // Preserve the JSON identity used by the first two milestones' curl checks.
   app.get('/', (req, res) => {
     if (!req.accepts('html') || !String(req.get('accept') || '').includes('text/html')) return res.json({ ...identity, photos: [] });
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.type('html').send(html);
   });
+  app.get('/index.html', (_req, res) => res.type('html').send(html));
   app.use(express.static(path.join(__dirname, 'public'), { index: false }));
   app.get('/whoami', (_req, res) => res.type('text/plain').send(`${identity.pod}\n`));
   app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));
@@ -106,7 +112,12 @@ function createApp(options = {}) {
     res.status(status).json({ error: status === 413 ? 'La limite est de 10 Mo par photo.' : status >= 500 ? 'Service indisponible. Réessaie dans quelques instants.' : error.message });
   });
 
-  return app;
+  if (!basePath) return app;
+  const mounted = express();
+  mounted.disable('x-powered-by');
+  mounted.locals.identity = identity;
+  mounted.use(basePath, app);
+  return mounted;
 }
 
 module.exports = { createApp };

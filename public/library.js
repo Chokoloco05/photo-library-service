@@ -1,12 +1,13 @@
 /* Shared library: all mutations go to PostgreSQL through the API. */
 const $ = selector => document.querySelector(selector);
+const BASE_PATH = new URL(document.baseURI).pathname.replace(/\/$/, '');
 const state = { photos: [], view: 'library', selected: new Set(), groups: [], pairs: [], editing: null, importing: false };
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const bytes = size => size < 1024 ? `${size} o` : size < 1048576 ? `${(size / 1024).toLocaleString('fr', { maximumFractionDigits: 1 })} Ko` : `${(size / 1048576).toLocaleString('fr', { maximumFractionDigits: 1 })} Mo`;
-const imageUrl = (photo, thumbnail = true) => `/api/photos/${encodeURIComponent(photo.id)}/image${thumbnail ? '?thumbnail=1' : ''}`;
+const imageUrl = (photo, thumbnail = true) => `${BASE_PATH}/api/photos/${encodeURIComponent(photo.id)}/image${thumbnail ? '?thumbnail=1' : ''}`;
 
 async function api(url, options) {
-  const response = await fetch(url, options);
+  const response = await fetch(`${BASE_PATH}${url}`, options);
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error || `Le service ne répond pas (${response.status}). Réessaie.`);
@@ -95,7 +96,7 @@ function compare(ids) {
   const photos = ids.map(id => state.photos.find(p => p.id === id)).filter(Boolean);
   if (!photos.length) return;
   $('#compare-title').textContent = photos.length === 2 ? 'Deux photos. À vous de choisir.' : 'Votre photo, en détail.';
-  $('#compare-content').innerHTML = photos.map(p => `<section class="compare-panel"><img src="${imageUrl(p, false)}" alt="${escapeHtml(p.title)}"><h3>${escapeHtml(p.title)}</h3><dl><dt>Fichier</dt><dd>${escapeHtml(p.filename)}</dd><dt>Dimensions</dt><dd>${p.width} × ${p.height} px</dd><dt>Poids original</dt><dd>${bytes(p.size_bytes)}</dd><dt>Format</dt><dd>${escapeHtml(p.mime_type.split('/')[1].toUpperCase())}</dd><dt>Ajoutée le</dt><dd>${new Date(p.created_at).toLocaleDateString('fr')}</dd></dl><p class="dialog-note">${escapeHtml(p.description || 'Aucune description pour le moment.')}</p><div class="compare-actions"><a class="button" href="/api/photos/${p.id}/download">Télécharger</a><button class="delete-button" data-delete="${p.id}">Supprimer cette copie</button></div></section>`).join('');
+  $('#compare-content').innerHTML = photos.map(p => `<section class="compare-panel"><img src="${imageUrl(p, false)}" alt="${escapeHtml(p.title)}"><h3>${escapeHtml(p.title)}</h3><dl><dt>Fichier</dt><dd>${escapeHtml(p.filename)}</dd><dt>Dimensions</dt><dd>${p.width} × ${p.height} px</dd><dt>Poids original</dt><dd>${bytes(p.size_bytes)}</dd><dt>Format</dt><dd>${escapeHtml(p.mime_type.split('/')[1].toUpperCase())}</dd><dt>Ajoutée le</dt><dd>${new Date(p.created_at).toLocaleDateString('fr')}</dd></dl><p class="dialog-note">${escapeHtml(p.description || 'Aucune description pour le moment.')}</p><div class="compare-actions"><a class="button" href="${BASE_PATH}/api/photos/${p.id}/download">Télécharger</a><button class="delete-button" data-delete="${p.id}">Supprimer cette copie</button></div></section>`).join('');
   const dialog = $('#compare-dialog'); if (!dialog.open) dialog.showModal();
 }
 async function removePhoto(id) {

@@ -13,7 +13,21 @@ spec:
     - matches:
         - path:
             type: PathPrefix
+            value: /dev
+      backendRefs:
+        - name: photo-service-dev
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /test
+      backendRefs:
+        - name: photo-service-test
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
             value: /
       backendRefs:
-        - name: photo-service
+        - name: photo-service-prod
           port: 80

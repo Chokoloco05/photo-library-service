@@ -1,8 +1,10 @@
 # Déploiement sur le cluster de l'école
 
+> Organisation confirmée par le professeur : Dev, Test et Prod sont dans `team5`, différenciés par leurs noms et labels. Voir le [plan actualisé](migration-complete-ecole.md). Les commandes de déploiement prennent `-Environment dev`, `test` ou `prod`.
+
 ## Accès et périmètre
 
-Le kubeconfig privé est `school_cluster/team5_cluster_info.yaml`. Il est ignoré par Git. Le contexte attendu est `team5@cluster-sc` et toutes les opérations de ce parcours ciblent explicitement le namespace `team5`.
+Le kubeconfig privé est `school_cluster/team5_cluster_info.yaml`. Il est ignoré par Git. Le contexte attendu est `team5@cluster-sc` et toutes les opérations ciblent explicitement `team5`. Les bases définitives et leurs Secrets sont `photo-db-dev`, `photo-db-test`, `photo-db-prod`.
 
 Le cluster local Docker Desktop reste indépendant. Aucun contrôleur Traefik supplémentaire, namespace global ou droit administrateur n'est installé à l'école. La route réutilise `infra/main-gateway` fourni par le professeur.
 
@@ -24,7 +26,7 @@ Une validation dry-run vérifie la structure et l'admission du manifeste. Elle n
 | Fichier | Rôle |
 | --- | --- |
 | `school_cluster/team5_cluster_info.yaml` | Kubeconfig privé, jamais versionné |
-| [gateway_template.yaml](../school_cluster/gateway_template.yaml) | Route `team5.laboinfo-ecam.be` vers `photo-service:80` |
+| [gateway_template.yaml](../school_cluster/gateway_template.yaml) | Route du domaine vers `photo-service-dev`, `photo-service-test` et `photo-service-prod` selon le chemin |
 | [Deployment école](../k8s/school/deployment.yaml) | Trois Pods ; environnement `school` ; PostgreSQL interne |
 | [Service école](../k8s/school/service.yaml) | ClusterIP port 80 vers les Pods sur 3000 |
 | [PostgreSQL commun](../k8s/database.yaml) | Service, StatefulSet et PVC ; namespace fourni à l'application |
@@ -82,7 +84,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-school.
 
 Omettre `-ImagePullSecret` seulement si l'accès à l'image ne nécessite pas ce Secret ou est déjà géré par le cluster. Ne pas supprimer le Secret `photo-db` indépendamment du volume existant : le mot de passe du PostgreSQL initialisé ne serait pas modifié automatiquement.
 
-Le script valide les manifestes applicatifs, prépare la base, applique trois répliques, attend leur disponibilité, puis applique la route. Il vérifie les conditions `Accepted` et `ResolvedRefs` sous `status.parents` pour `infra/main-gateway`.
+Le script préfixe les ressources selon `-Environment`, valide les manifestes, prépare la base dédiée et applique trois répliques. La route partagée est appliquée quand les trois Services existent. Il vérifie les conditions `Accepted` et `ResolvedRefs` sous `status.parents` pour `infra/main-gateway`.
 
 ## Validation finale à effectuer
 
