@@ -95,3 +95,58 @@ jobs:
           kubectl --context docker-desktop get pods -n test -o wide --request-timeout=15s
           kubectl --context docker-desktop describe deployment/photo-service -n test --request-timeout=15s
           kubectl --context docker-desktop get events -n test --sort-by=.metadata.creationTimestamp --request-timeout=15s
+
+  publish-school-image:
+    name: Publish private school image to GHCR
+    needs: build-and-deploy-test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build and publish a private versioned image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          owner="${GITHUB_REPOSITORY_OWNER}"
+          package="${GITHUB_REPOSITORY#*/}"
+          package="${package,,}"
+          api="https://api.github.com/users/${owner}/packages/container/${package}"
+          status=$(curl --silent --show-error --output package-info.json --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header 'Accept: application/vnd.github+json' "$api")
+          if [ "$status" = 200 ]; then
+            python3 -c "import json; p=json.load(open('package-info.json')); assert p['visibility']=='private', 'Refusing to publish private application code into a non-private package'"
+          elif [ "$status" != 404 ]; then
+            echo "Cannot verify package visibility (HTTP $status)."
+            exit 1
+          fi
+          tag="sha-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker build --build-arg "APP_REVISION=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            -t "${image}:${tag}" .
+          docker push "${image}:${tag}"
+          curl --fail --silent --show-error --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header 'Accept: application/vnd.github+json' "$api" --output package-info.json
+          python3 -c "import json; p=json.load(open('package-info.json')); assert p['visibility']=='private', 'Expected a private package'"
+          digest=$(docker image inspect "${image}:${tag}" --format '{{index .RepoDigests 0}}')
+          {
+            echo '## Private school image'
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- Tag: ${image}:${tag}"
+            echo "- Deploy by digest: ${digest}"
+            echo '- Visibility: private (verified)'
+            echo '- School deployment requires a separate read:packages credential.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Log out of GHCR
+        if: always()
+        run: docker logout ghcr.io

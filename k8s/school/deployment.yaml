@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: photo-service
+  namespace: team5
+  labels:
+    app: photo-service
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: photo-service
+  template:
+    metadata:
+      labels:
+        app: photo-service
+    spec:
+      terminationGracePeriodSeconds: 25
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: photo-service
+          image: photo-service:must-be-rendered
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command: [sh, -c, sleep 5]
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: APP_ENV
+              value: school
+            - name: PGHOST
+              value: photo-db
+            - name: PGDATABASE
+              value: photo_service
+            - name: PGUSER
+              value: photo
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: photo-db
+                  key: password
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+          resources:
+            requests:
+              cpu: 100m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
