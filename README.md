@@ -12,7 +12,7 @@ Projet 2026A : une photothèque web avec import, recherche, détection des doubl
 | [Validations](docs/validation.md) | Comptes rendus datés, captures et résultats des tests |
 | [Banque de révision](docs/banque-questions-revision.md) | 88 questions pour comprendre le projet et préparer l’oral |
 
-Le [support PDF de code](output/pdf/photo-service-support-etude-code.pdf) reste disponible pour étudier. C’est un instantané du 1er novembre ; les guides ci-dessus décrivent les évolutions plus récentes.
+Le [support PDF de code](output/pdf/photo-service-support-etude-code.pdf) est actualisé au 6 novembre : 99 pages A4, 46 fichiers reproduits et des repères pour l’oral. Le générateur est conservé dans `scripts/build-study-pdf.py`.
 
 ## État vérifié au 6 novembre 2026
 
