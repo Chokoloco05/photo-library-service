@@ -277,3 +277,22 @@ Le mode HTTP de démonstration est explicitement autorisé pour `http://team5.la
 La suite comporte maintenant **28 tests réussis avec PostgreSQL**, aucun ignoré. Le test de domaine virtuel vérifie la connexion HTTP, le cookie, une session active, le refus des mutations anonymes et sans CSRF, le refus d’une origine étrangère, l’import et la suppression autorisés. Une image locale `photo-service:shared-admin-20261110` a été construite pour ce changement.
 
 Le compte est préparé à l’école, mais la nouvelle image n’y est pas encore publiée ni déployée ; les trois Deployments école restent à zéro réplique. Les modifications de code ne sont pas encore committées ou poussées.
+
+
+<a id="publication-auth-ecole"></a>
+
+## Publication et déploiement de l'authentification — 10 novembre 2026
+
+Cette validation remplace les états précédents indiquant l'arrêt des applications ou l'absence de publication de la version authentifiée.
+
+- Code publié : `7dae5ff718d1ec9f5533991a396b6892aa9135da`, version 2.1.0.
+- [Pipeline GitHub réussi](https://github.com/Chokoloco05/photo-library-service/actions/runs/42828170689) : tests, build/rollout Test local, publication privée GHCR.
+- Image immuable déployée dans les trois environnements : `ghcr.io/chokoloco05/photo-library-service@sha256:8b5be1adaa1706faac93ed54f2aaa5e9735d490c26ecb3da1d387930a6072bb4`.
+- Déploiement école exécuté avec `deploy-school.ps1`, d'abord en Test. Après vérification, le même digest a été déployé en Dev et Production. Le pipeline n'automatise pas encore cette promotion distante.
+- Neuf Pods applicatifs prêts, sans redémarrage observé ; bases et volumes conservés. Les migrations additives s'appliquent au démarrage.
+- Pages HTML, JavaScript, CSS, diagnostics et readiness accessibles. Les fichiers JavaScript/CSS distants correspondent au code testé.
+- Compte admin configuré et mode HTTP de démonstration actif dans les trois environnements, avec une référence commune à `team5/photo-auth`.
+- POST/PATCH/DELETE anonymes refusés avec HTTP 401. La connexion avec un identifiant de vérification invalide est refusée avec HTTP 401. Le mot de passe du vrai administrateur n'a pas été utilisé ni affiché pour ces contrôles.
+- Les tests locaux avec PostgreSQL et Chrome ont validé le parcours authentifié. La navigation Chrome automatisée vers le domaine distant a renvoyé `ERR_BLOCKED_BY_CLIENT` ; les vérifications distantes ont été effectuées au niveau HTTP/API. Aucune validation visuelle distante n'est revendiquée.
+
+Les [résultats structurés](evidence/school-auth-release-2026-11-10.json) conservent les contrôles et la version sans secret. Ce déploiement depuis des applications arrêtées ne constitue pas une démonstration mesurée de zéro interruption.

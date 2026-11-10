@@ -14,14 +14,22 @@ Projet 2026A : une photothèque web avec import, recherche, détection des doubl
 
 Le [support PDF de code](output/pdf/photo-service-support-etude-code.pdf) est actualisé au 6 novembre : 99 pages A4, 46 fichiers reproduits et des repères pour l’oral. Le générateur est conservé dans `scripts/build-study-pdf.py`.
 
-Un compte administrateur unique, commun aux environnements, protège désormais les mutations dans le code en préparation : consulter le [guide de configuration](docs/application.md#compte-administrateur-commun). Le PDF du 6 novembre précède cette évolution. Les applications école ont été temporairement arrêtées pour préparer cette protection ; les bases et volumes sont conservés.
+Un compte administrateur unique, commun aux environnements, protège désormais les mutations de la version 2.1.0 publiée et déployée : consulter le [guide de configuration](docs/application.md#compte-administrateur-commun). Le PDF du 6 novembre précède cette évolution. Les trois applications école sont de nouveau en service. Le mode HTTP de démonstration est activé ; les échanges ne sont pas chiffrés.
 
-## État vérifié au 6 novembre 2026
+## État vérifié au 10 novembre 2026
 
 - Les trois milestones disposent de preuves locales : application répliquée via Traefik, pipeline Test et scaling depuis Headlamp.
-- Le [dernier pipeline GitHub](https://github.com/Chokoloco05/photo-library-service/actions/runs/42245846705) est réussi : tests, build/rollout Test local et publication privée GHCR.
-- À l’école, Dev/Test/Production sont déployés dans `team5` : neuf Pods applicatifs et trois bases indépendantes. Les tests internes passent ; l’accès web externe reste bloqué par la résolution DNS du domaine.
+- Le [dernier pipeline GitHub](https://github.com/Chokoloco05/photo-library-service/actions/runs/42828170689) est réussi : tests, build/rollout Test local et publication privée GHCR.
+- À l’école, Dev/Test/Production sont accessibles dans `team5` : neuf Pods applicatifs prêts et trois bases indépendantes. Les pages et API répondent HTTP 200 ; les écritures anonymes sont refusées avec HTTP 401.
 - Restent notamment la réplication et le sharding PostgreSQL, le cache répliqué, le rafraîchissement de Test, la promotion Production, la preuve sans interruption et le transfert complet du pipeline et du dashboard vers l’école.
+
+## Accès école
+
+- Dev : http://team5.laboinfo-ecam.be/dev/
+- Test : http://team5.laboinfo-ecam.be/test/
+- Production : http://team5.laboinfo-ecam.be/
+
+Consultation publique ; connexion avec le compte `admin` commun pour modifier la bibliothèque. Voir les [preuves du déploiement](docs/validation.md#publication-auth-ecole).
 
 ## Accès locaux
 

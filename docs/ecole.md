@@ -1,8 +1,8 @@
 # Cluster de l'école : accès, déploiement et migration
 
-État de référence : 6 novembre 2026. Les résultats détaillés sont regroupés dans [validation.md](validation.md#ecole).
+État de référence : **10 novembre 2026**, après publication et déploiement de la version 2.1.0 avec compte administrateur commun. Les trois environnements sont en service, avec trois répliques chacun. Les bases et volumes antérieurs sont conservés.
 
-Mise à jour du 10 novembre : l'API et les trois environnements ont été vérifiés accessibles en HTTP ; le domaine se résout désormais. HTTPS échoue encore lors de la négociation TLS. Les Deployments applicatifs ont ensuite été mis à zéro réplique pendant la préparation de la version 2.1 avec authentification ; les bases et volumes sont conservés. Le pipeline et l'image authentifiée n'ont pas encore été publiés. Le compte admin commun est configuré dans `team5/photo-auth`, avec HTTP de démonstration explicitement autorisé sur le domaine école. Les descriptions et nombres ci-dessous correspondent à la validation antérieure.
+Le [pipeline réussi](https://github.com/Chokoloco05/photo-library-service/actions/runs/42828170689) a publié l'image privée du commit `7dae5ff`. Le même digest a ensuite été déployé avec le script, d'abord en Test puis en Dev et Production. Les [preuves de vérification](validation.md#publication-auth-ecole) distinguent le pipeline automatisé du déploiement école effectué séparément.
 
 ## Organisation demandée par le professeur
 
@@ -84,20 +84,27 @@ Le script génère les noms et selectors, valide les manifestes auprès du serve
 
 Pour préparer uniquement une base, utiliser `-Action Database -Environment dev`, `test` ou `prod`. Ne pas supprimer un Secret de base indépendamment du PVC : le mot de passe du PostgreSQL déjà initialisé ne serait pas modifié automatiquement.
 
-## Accès web : blocage DNS connu
+## Accès web et authentification
+
+| Environnement | Adresse |
+| --- | --- |
+| Dev | http://team5.laboinfo-ecam.be/dev/ |
+| Test | http://team5.laboinfo-ecam.be/test/ |
+| Production | http://team5.laboinfo-ecam.be/ |
+
+Le DNS est désormais résolu. La Gateway accepte la route et ses références : `Accepted=True`, `ResolvedRefs=True`. Les trois pages HTML, leurs ressources, `/api/info` et `/readyz` ont été vérifiés ; les versions et environnements correspondent aux chemins.
+
+La consultation est publique. Un seul compte `admin` permet les imports, modifications et suppressions ; son mot de passe est celui choisi en Dev local. Les trois Deployments école utilisent **le même Secret `team5/photo-auth`**. Les sessions et données restent propres à chaque environnement. La [configuration du compte commun](application.md#compte-administrateur-commun) ne stocke que le hachage du mot de passe.
+
+Le propriétaire a explicitement choisi le mode HTTP pour la démonstration. `AUTH_ALLOW_DEMO_HTTP=true` et `AUTH_PUBLIC_ORIGIN=http://team5.laboinfo-ecam.be` permettent la connexion sans attendre TLS. Les échanges ne sont pas chiffrés : ne pas réutiliser un mot de passe personnel ni déposer des photos sensibles. HTTPS reste à configurer avec le professeur pour une utilisation réelle ; la désactivation du mode de démonstration rétablit l'exigence HTTPS.
+
+Les écritures anonymes renvoient HTTP 401 dans les trois environnements. Des identifiants invalides renvoient HTTP 401 au lieu de l'ancien blocage HTTP 426. Le test de connexion du vrai utilisateur reste à faire avec son mot de passe, qui n'a pas été demandé ni affiché pendant le déploiement.
+
+Image actuellement déployée :
 
 ```text
-Navigateur -> team5.laboinfo-ecam.be -> Gateway infra/main-gateway
-                 /dev/  -> photo-service-dev  -> photo-db-dev
-                 /test/ -> photo-service-test -> photo-db-test
-                 /      -> photo-service-prod -> photo-db-prod
+ghcr.io/chokoloco05/photo-library-service@sha256:8b5be1adaa1706faac93ed54f2aaa5e9735d490c26ecb3da1d387930a6072bb4
 ```
-
-La Gateway accepte la route et ses références. Les applications fonctionnent via les Services internes, mais le domaine n'est résolu ni depuis le PC ni depuis le cluster. Une requête DNS publique a renvoyé NXDOMAIN.
-
-Demander au professeur de confirmer le nom et de configurer son enregistrement A/AAAA ou CNAME vers l'entrée Gateway, ou de préciser la résolution privée/VPN attendue. Un kubeconfig et une HTTPRoute ne créent pas l'enregistrement DNS. Aucune adresse IP n'a été inventée pour contourner ce problème.
-
-Après résolution, vérifier HTTP/HTTPS selon le listener fourni par l'école, puis `/dev/api/info`, `/test/api/info`, `/api/info` et les trois readiness. La révision doit correspondre au commit de l'image, et l'environnement au chemin.
 
 ## Permissions et monitoring
 
