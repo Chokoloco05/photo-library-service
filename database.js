@@ -36,6 +36,18 @@ function createDatabase(config = {}) {
     migrate: () => migrate(pool),
     close: () => pool.end(),
     ready: async () => { await pool.query('SELECT 1'); },
+    authSession: async (hash, credential) => (await pool.query(
+      'SELECT csrf_token FROM auth_sessions WHERE token_hash=$1 AND credential_id=$2 AND expires_at>now()', [hash, credential])).rows[0],
+    authDelete: async hash => { await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1', [hash]); },
+    authCreate: async (hash, csrf, credential, seconds) => {
+      await pool.query('DELETE FROM auth_sessions WHERE expires_at<=now() OR credential_id<>$1', [credential]);
+      await pool.query('INSERT INTO auth_sessions(token_hash,csrf_token,credential_id,expires_at) VALUES ($1,$2,$3,now()+$4*interval \'1 second\')', [hash, csrf, credential, seconds]);
+    },
+    authAttempt: async bucket => {
+      await pool.query('DELETE FROM auth_attempts WHERE expires_at<=now()');
+      const result = await pool.query('INSERT INTO auth_attempts(bucket) VALUES ($1) ON CONFLICT(bucket) DO UPDATE SET attempts=auth_attempts.attempts+1 RETURNING attempts', [bucket]);
+      return result.rows[0].attempts <= 10;
+    },
     list: async () => (await pool.query(`SELECT ${columns} FROM photos ORDER BY created_at DESC, id LIMIT 2001`)).rows,
     insert: async photo => {
       const client = await pool.connect();

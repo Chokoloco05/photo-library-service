@@ -37,6 +37,11 @@ spec:
           ports:
             - name: http
               containerPort: 3000
+          envFrom:
+            - prefix: AUTH_
+              secretRef:
+                name: photo-auth
+                optional: true
           env:
             - name: APP_ENV
               value: school

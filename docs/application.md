@@ -45,7 +45,33 @@ Chaque environnement possède sa propre base. Les originaux (`bytea`), miniature
 
 Cette première version utilise **un PostgreSQL par environnement**, avec un StatefulSet et un PVC. La réplication et le sharding de la base, ainsi que le cache répliqué, restent à ajouter pour le barème final. Ne pas augmenter simplement les répliques de ce StatefulSet : cela ne configurerait pas de réplication PostgreSQL.
 
-La bibliothèque est partagée, sans comptes utilisateurs ni authentification applicative. Elle convient à la démonstration locale ; prévoir le contrôle d’accès et HTTPS avant d’y déposer des photos privées sur un domaine public.
+La bibliothèque reste partagée et sa **consultation est publique**, y compris les téléchargements. Depuis l'ajout de l'authentification, un compte administrateur est obligatoire pour importer, modifier ou supprimer ; les contrôles sont appliqués par l'API, avant le traitement des fichiers. Ne pas utiliser cette bibliothèque publique pour des photos privées.
+
+## Compte administrateur commun
+
+La consultation et les téléchargements restent publics. Le formulaire **Se connecter** demande le mot de passe du compte unique `admin` pour importer, modifier ou supprimer. Les contrôles s'appliquent aussi à l'API : masquer les boutons ne constitue pas la protection.
+
+Le même mot de passe est utilisé partout. Son hachage scrypt salé est copié dans `photo-auth` dans les namespaces locaux `dev` et `test`. À l'école, **un seul Secret `team5/photo-auth`** est référencé par les trois environnements. Les mots de passe ne sont jamais intégrés au HTML, au JavaScript ou à l'image Docker. Les bibliothèques et les sessions restent séparées ; ce compte partagé ne constitue pas une connexion unique automatique entre environnements.
+
+Le mot de passe précédemment choisi en Dev est réutilisé. Il n'est pas nécessaire de créer trois comptes ou de relancer une configuration par environnement. Pour changer ultérieurement le mot de passe **une seule fois** et le distribuer partout, utiliser la saisie masquée :
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\configure-auth.ps1 -ChangePassword -DemoHttp
+```
+
+Sans `-ChangePassword`, cette commande réutilise le hachage du compte Dev. `-Target Local` ou `-Target School` permet de limiter une synchronisation si un cluster est indisponible. Le script conserve le nombre de répliques, redémarre les Pods existants et ne touche pas aux photos.
+
+### HTTP pour la démonstration
+
+À la demande du propriétaire du projet, le mode de démonstration autorise la connexion sur **http://team5.laboinfo-ecam.be**, sans attendre HTTPS. Il est activé explicitement par `AUTH_ALLOW_DEMO_HTTP=true` avec `AUTH_PUBLIC_ORIGIN=http://team5.laboinfo-ecam.be`. Le compte reste protégé par son mot de passe, mais **le mot de passe, la session et les photos transitent sans chiffrement**. Utiliser un mot de passe exclusivement réservé à ce projet et des images non sensibles. Ce mode ne remplace pas HTTPS et ne convient pas à une exploitation réelle sur un réseau non fiable.
+
+Le cookie reste `HttpOnly` et `SameSite=Strict`, mais ne porte pas `Secure` en mode HTTP. Le jeton CSRF, la vérification de l'origine exacte et la limitation des tentatives restent actifs. Sans activation explicite, la connexion distante continue d'exiger HTTPS. Pour passer ensuite à HTTPS, relancer la synchronisation sans `-DemoHttp` : l'origine école revient à HTTPS et le cookie est sécurisé.
+
+Les sessions aléatoires sont hachées en PostgreSQL et expirent après huit heures ; la déconnexion les révoque. Les répliques partagent ces tables sans session collante. Chaque base conserve son budget de dix tentatives par fenêtre de quinze minutes. Un changement de mot de passe invalide les anciennes sessions après remplacement des Pods.
+
+Sans Secret valide, la bibliothèque démarre en lecture seule. La migration `003-auth.sql` ajoute les sessions et la limitation sans modifier les photos existantes. Pour lancer Node directement, fournir `AUTH_ADMIN_USER=admin` et `AUTH_ADMIN_PASSWORD_HASH`, ainsi que `AUTH_ALLOW_LOCAL_HTTP=true` uniquement sur localhost.
+
+Implémentation : [auth.js](../auth.js), [migration](../migrations/003-auth.sql), [synchronisation du compte](../scripts/configure-auth.ps1). Le PDF du 6 novembre précède cette fonctionnalité. Référence de sécurité : [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
 
 <a id="lancement-et-arret"></a>
 
@@ -57,7 +83,7 @@ Dev, depuis la racine du projet avec Docker Desktop et Kubernetes démarrés :
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-docker-desktop.ps1
 ```
 
-Le script construit `photo-service:v2.0.0`, installe la base Dev si nécessaire, puis déploie trois Pods applicatifs. Pour Test, le pipeline GitHub existant construit une image unique puis appelle `deploy-test.ps1`, qui prépare désormais aussi la base Test.
+Le script construit `photo-service:v2.1.0`, installe la base Dev si nécessaire, puis déploie trois Pods applicatifs. Pour Test, le pipeline GitHub existant construit une image unique puis appelle `deploy-test.ps1`, qui prépare désormais aussi la base Test.
 
 `scripts/database.ps1` crée un mot de passe aléatoire par environnement dans le Secret Kubernetes `photo-db`. Il conserve le Secret existant à chaque lancement. Ne pas supprimer ce Secret indépendamment du PVC : le mot de passe du PostgreSQL déjà initialisé ne changerait pas automatiquement.
 
@@ -114,6 +140,7 @@ docker --context desktop-linux compose stop database
 
 - `migrations/001-library.sql` crée la bibliothèque.
 - `migrations/002-description.sql` ajoute une colonne `description`, avec une valeur par défaut pour les anciennes photos.
+- `migrations/003-auth.sql` ajoute les sessions et la limitation des connexions.
 - `schema_migrations` conserve les migrations appliquées.
 - Au démarrage, `server.js` applique les nouvelles migrations avant d’accepter les requêtes.
 - Une transaction et un verrou PostgreSQL sérialisent cette opération entre les trois Pods.
@@ -140,6 +167,9 @@ Ils vérifient aussi la migration d’une base contenant déjà une photo, l’a
 | Méthode et chemin | Rôle |
 | --- | --- |
 | `GET /api/info` | Version, révision, environnement et Pod |
+| `GET /api/auth/session` | État de connexion et jeton CSRF de la session courante |
+| `POST /api/auth/login` | Connexion JSON `{ "username": "...", "password": "..." }`, origine contrôlée ; HTTPS ou mode HTTP de démonstration explicite |
+| `POST /api/auth/logout` | Déconnexion et révocation ; cookie et `X-CSRF-Token` requis |
 | `GET /api/photos` | Métadonnées de la bibliothèque |
 | `POST /api/photos` | Fichier image brut, avec `Content-Type` et nom encodé dans `X-Filename` |
 | `PATCH /api/photos/:id` | JSON `{ "title": "...", "description": "..." }` |

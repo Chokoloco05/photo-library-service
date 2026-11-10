@@ -8,6 +8,7 @@ const { Pool } = require('pg');
 const { createApp } = require('../app');
 const { createDatabase } = require('../database');
 const { fixture } = require('./fixtures');
+const { hashPassword } = require('../auth');
 
 test('PostgreSQL migrations and shared library lifecycle across two application instances', {
   skip: !process.env.TEST_DATABASE_URL && 'Set TEST_DATABASE_URL to run the real PostgreSQL integration test',
@@ -19,6 +20,8 @@ test('PostgreSQL migrations and shared library lifecycle across two application 
   const database = createDatabase(config), otherDatabase = createDatabase(config);
   const servers = [];
   try {
+    const password = 'integration-only-password-2026';
+    const auth = { username: 'admin', passwordHash: await hashPassword(password), localHttp: true };
     // Simulate an existing v1 database containing a photo before migration 002.
     await database.pool.query('CREATE TABLE schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
     await database.pool.query(await readFile(path.join(__dirname, '../migrations/001-library.sql'), 'utf8'));
@@ -28,15 +31,111 @@ test('PostgreSQL migrations and shared library lifecycle across two application 
     await database.pool.query('INSERT INTO photos(id,filename,title,mime_type,size_bytes,width,height,sha256,visual_hash,original,thumbnail) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
       [legacy.id, legacy.filename, legacy.title, legacy.mime_type, legacy.size_bytes, legacy.width, legacy.height, legacy.sha256, legacy.visual_hash, legacy.original, legacy.thumbnail]);
     await Promise.all([database.migrate(), otherDatabase.migrate()]);
-    assert.equal((await database.pool.query('SELECT * FROM schema_migrations')).rowCount, 2);
+    assert.equal((await database.pool.query('SELECT * FROM schema_migrations')).rowCount, 3);
     const migrated = (await otherDatabase.list())[0];
     assert.equal(migrated.id, legacy.id); assert.equal(migrated.description, '');
     assert.deepEqual((await otherDatabase.image(legacy.id, false)).data, legacy.original);
     await database.delete(legacy.id);
     for (const [index, store] of [database, otherDatabase].entries()) {
-      const server = createApp({ database: store, basePath: index ? '/test' : '' }).listen(0, '127.0.0.1'); servers.push(server); await once(server, 'listening');
+      const server = createApp({ database: store, auth, basePath: index ? '/test' : '' }).listen(0, '127.0.0.1'); servers.push(server); await once(server, 'listening');
     }
     const [base, other] = servers.map((server, index) => `http://127.0.0.1:${server.address().port}${index ? '/test' : ''}`);
+    const sessions = new Map();
+    for (const url of [base, other]) {
+      const login = await global.fetch(`${url}/api/auth/login`, { method: 'POST', headers: {
+        Origin: new URL(url).origin, 'Content-Type': 'application/json',
+      }, body: JSON.stringify({ username: 'admin', password }) });
+      assert.equal(login.status, 200);
+      assert.match(login.headers.get('set-cookie'), /HttpOnly/);
+      assert.match(login.headers.get('set-cookie'), /SameSite=Strict/);
+      if (url === other) assert.match(login.headers.get('set-cookie'), /Path=\/test/);
+      sessions.set(url, { Cookie: login.headers.get('set-cookie').split(';')[0],
+        'X-CSRF-Token': (await login.json()).csrfToken, Origin: new URL(url).origin });
+    }
+    const fetch = (url, options = {}) => global.fetch(url, { ...options,
+      headers: { ...sessions.get(url.startsWith(other) ? other : base), ...options.headers } });
+    await t.test('blocks anonymous writes, shares sessions across replicas and revokes logout', async () => {
+      for (const method of ['POST', 'PATCH', 'DELETE']) {
+        const route = method === 'POST' ? '/api/photos' : '/api/photos/11111111-1111-4111-8111-111111111111';
+        assert.equal((await global.fetch(`${base}${route}`, { method })).status, 401);
+      }
+      const peer = createApp({ database: otherDatabase, auth, basePath: '/test' }).listen(0, '127.0.0.1');
+      servers.push(peer); await once(peer, 'listening');
+      const peerUrl = `http://127.0.0.1:${peer.address().port}/test`;
+      let response = await global.fetch(`${peerUrl}/api/auth/session`, { headers: { Cookie: sessions.get(other).Cookie } });
+      assert.equal((await response.json()).authenticated, true);
+      response = await global.fetch(`${other}/api/photos`, { method: 'POST', headers: { Cookie: sessions.get(other).Cookie } });
+      assert.equal(response.status, 403); // No CSRF token.
+      const temporary = await global.fetch(`${peerUrl}/api/auth/login`, { method: 'POST', headers: {
+        Origin: new URL(peerUrl).origin, 'Content-Type': 'application/json',
+      }, body: JSON.stringify({ username: 'admin', password }) });
+      const cookie = temporary.headers.get('set-cookie').split(';')[0];
+      const csrf = (await temporary.json()).csrfToken;
+      assert.equal((await global.fetch(`${other}/api/auth/logout`, { method: 'POST', headers: {
+        Cookie: cookie, Origin: new URL(other).origin, 'X-CSRF-Token': csrf,
+      } })).status, 204);
+      assert.equal((await (await global.fetch(`${peerUrl}/api/auth/session`, { headers: { Cookie: cookie } })).json()).authenticated, false);
+      const stored = await database.pool.query('SELECT token_hash FROM auth_sessions');
+      assert.ok(stored.rows.every(row => !sessions.get(base).Cookie.endsWith(row.token_hash)));
+    });
+    await t.test('rejects forged, expired and cross-environment sessions and limits attempts across replicas', async () => {
+      const cookie = sessions.get(base).Cookie;
+      const anonymous = await global.fetch(`${base}/api/auth/session`, { headers: { Cookie: cookie.replace(/=[a-f0-9]+$/, '=' + '0'.repeat(64)) } });
+      assert.equal((await anonymous.json()).authenticated, false);
+      // A root cookie cannot authenticate the /test application (distinct name).
+      assert.equal((await (await global.fetch(`${other}/api/auth/session`, { headers: { Cookie: cookie } })).json()).authenticated, false);
+      const { createHash } = require('node:crypto');
+      const hash = createHash('sha256').update(cookie.split('=')[1]).digest('hex');
+      await database.pool.query("UPDATE auth_sessions SET expires_at=now()-interval '1 second' WHERE token_hash=$1", [hash]);
+      assert.equal((await (await global.fetch(`${base}/api/auth/session`, { headers: { Cookie: cookie } })).json()).authenticated, false);
+      await database.pool.query("UPDATE auth_sessions SET expires_at=now()+interval '1 hour' WHERE token_hash=$1", [hash]);
+      assert.equal(await otherDatabase.authSession(hash, 'changed-password-fingerprint'), undefined);
+      const attempts = await Promise.all(Array.from({ length: 12 }, (_, i) =>
+        (i % 2 ? database : otherDatabase).authAttempt('shared-test-budget')));
+      assert.equal(attempts.filter(Boolean).length, 10);
+    });
+    await t.test('shared admin works in explicit HTTP demo mode only on its configured school origin', async () => {
+      const origin = 'http://team5.laboinfo-ecam.be';
+      const demo = createApp({ database: otherDatabase, basePath: '/test',
+        auth: { ...auth, localHttp: false, demoHttp: true, publicOrigin: origin } }).listen(0, '127.0.0.1');
+      servers.push(demo); await once(demo, 'listening');
+      const url = `http://127.0.0.1:${demo.address().port}/test`;
+      // node:http preserves the virtual Host header; fetch may replace it with the URL host.
+      const request = (suffix, options = {}) => new Promise((resolve, reject) => {
+        const outgoing = require('node:http').request(url + suffix, options, response => {
+          const chunks = [];
+          response.on('data', chunk => chunks.push(chunk));
+          response.on('end', () => resolve({ status: response.statusCode,
+            headers: new Headers(Object.fromEntries(Object.entries(response.headers).map(([key, value]) => [key, Array.isArray(value) ? value.join(', ') : value]))),
+            json: async () => JSON.parse(Buffer.concat(chunks).toString()),
+          }));
+        });
+        outgoing.on('error', reject); outgoing.end(options.body);
+      });
+      const headers = { Host: 'team5.laboinfo-ecam.be', Origin: origin, 'Content-Type': 'application/json' };
+      const login = await request('/api/auth/login', { method: 'POST', headers,
+        body: JSON.stringify({ username: 'admin', password }) });
+      assert.equal(login.status, 200);
+      assert.doesNotMatch(login.headers.get('set-cookie'), /; Secure/);
+      assert.match(login.headers.get('set-cookie'), /HttpOnly/);
+      const cookie = login.headers.get('set-cookie').split(';')[0];
+      const result = await login.json();
+      assert.equal(result.demoHttp, true);
+      const state = await request('/api/auth/session', { headers: { Host: headers.Host, Cookie: cookie } });
+      assert.equal((await state.json()).authenticated, true);
+      assert.equal((await request('/api/photos', { method: 'POST', headers })).status, 401);
+      assert.equal((await request('/api/photos', { method: 'POST', headers: { ...headers, Cookie: cookie } })).status, 403);
+      assert.equal((await request('/api/auth/login', { method: 'POST', headers: { ...headers, Host: 'untrusted.example', Origin: 'http://untrusted.example' },
+        body: JSON.stringify({ username: 'admin', password }) })).status, 403);
+      const upload = await request('/api/photos', { method: 'POST', headers: {
+        Host: headers.Host, Origin: origin, Cookie: cookie, 'X-CSRF-Token': result.csrfToken, 'Content-Type': 'image/png',
+      }, body: await fixture() });
+      assert.equal(upload.status, 201);
+      const photo = await upload.json();
+      assert.equal((await request(`/api/photos/${photo.id}`, { method: 'DELETE', headers: {
+        Host: headers.Host, Origin: origin, Cookie: cookie, 'X-CSRF-Token': result.csrfToken,
+      } })).status, 204);
+    });
     const input = await fixture();
     const upload = async (url, name = 'photo.png', content = input) => fetch(`${url}/api/photos`, {
       method: 'POST', headers: { 'Content-Type': 'image/png', 'X-Filename': encodeURIComponent(name) }, body: content,

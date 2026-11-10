@@ -8,6 +8,7 @@ Ces comptes rendus décrivent des vérifications datées, et non un contrôle pe
 - [Application — bibliothèque et persistance](#application)
 - [École — 6 novembre 2026](#ecole)
 - [Pipeline actuel](#pipeline)
+- [Authentification — 10 novembre 2026](#authentification)
 
 <a id="milestone1"></a>
 
@@ -246,3 +247,33 @@ L'audit initial avait identifié un déploiement en attente du runner local : le
 - [Run `42245846705`](https://github.com/Chokoloco05/photo-library-service/actions/runs/42245846705), commit `3bd4325` : 21 tests, build, rollout Test local et publication GHCR réussis.
 
 Le déploiement école des trois environnements a ensuite été effectué manuellement avec le script du projet. L'automatisation Test école, la validation avant promotion Production et la démonstration complète sans interruption restent à réaliser. Le blocage DNS et les permissions manquantes sont détaillés dans le [guide école](ecole.md).
+
+<a id="authentification"></a>
+
+## Authentification — 10 novembre 2026
+
+Version 2.1.0 préparée localement, sans commit ni publication à ce stade. L'image a été chargée dans les Deployments locaux Dev/Test en conservant zéro réplique : aucun ancien code sans protection ne sera relancé par leur simple remise à trois répliques. Le runner, les bases locales, Traefik et le monitoring ont également été arrêtés ; Docker Desktop reste ouvert. La consultation reste publique dans la nouvelle version ; l'import, la modification et la suppression requièrent une session administrateur et un jeton CSRF. Sans compte configuré, les écritures sont refusées.
+
+- Syntaxe JavaScript et PowerShell vérifiée ; **26 tests passent avec PostgreSQL**, aucun test ignoré.
+- Une base Docker temporaire distincte des bases Dev/Test/école a servi aux vérifications. Les tests créent et nettoient leurs schémas isolés.
+- Vérifications : mots de passe scrypt salés, refus HTTP distant et origine étrangère, refus des écritures anonymes, session partagée entre instances, CSRF manquant refusé, déconnexion effective, cookies distincts par chemin, expiration et changement de configuration, budget de tentatives partagé.
+- Chrome : lecture seule publique, mauvais mot de passe, connexion, import sous `/dev/`, modification, maintien de session après actualisation, déconnexion, écritures ensuite refusées. Aucun problème JavaScript ni débordement mobile observé.
+- [Capture de la connexion](evidence/auth-login.png), sans mot de passe ni token.
+- Image Linux `photo-service:auth-20261110-worktree` construite : migrations, scrypt, connexion, import et suppression autorisés vérifiés dans le conteneur, version 2.1.0.
+- Les trois manifestes de Deployment ont passé le dry-run client. Les Secrets restent optionnels pour permettre un démarrage en lecture seule.
+- Le rendu école de Test a passé le dry-run serveur, sans modifier les ressources distantes. Le domaine répond HTTP 503 après la mise à zéro des trois applications, comme attendu.
+
+Avant ces changements, l'API école et le domaine HTTP ont été vérifiés fonctionnels. Les trois Deployments école ont ensuite été arrêtés à zéro réplique pour retirer l'ancienne application publique sans authentification ; les bases et volumes ont été conservés. HTTPS reste à activer côté école avant de permettre une connexion administrateur en ligne.
+
+Le mot de passe final n'a pas été choisi, affiché ou stocké dans le dépôt. La configuration se fait avec `scripts/configure-auth.ps1`, après déploiement de l'image authentifiée. Les accès Kubernetes, les Secrets du cluster et les photos utilisateur n'ont pas été utilisés comme fixtures de test.
+
+
+## Compte admin commun et démonstration HTTP — 10 novembre 2026
+
+Changement demandé : même compte `admin` et même mot de passe dans tous les environnements, avec consultation publique. Le hachage déjà choisi en Dev a été synchronisé vers Test et vers un seul Secret `team5/photo-auth`, sans lecture ni affichage du mot de passe. Les trois modèles école référencent désormais ce Secret commun. Les sessions et les bibliothèques restent séparées.
+
+Le mode HTTP de démonstration est explicitement autorisé pour `http://team5.laboinfo-ecam.be`. Il permet la connexion sans HTTPS, mais les identifiants et sessions transitent sans chiffrement. Les cookies HttpOnly/SameSite, le contrôle d’origine, le jeton CSRF et la limitation des tentatives restent actifs.
+
+La suite comporte maintenant **28 tests réussis avec PostgreSQL**, aucun ignoré. Le test de domaine virtuel vérifie la connexion HTTP, le cookie, une session active, le refus des mutations anonymes et sans CSRF, le refus d’une origine étrangère, l’import et la suppression autorisés. Une image locale `photo-service:shared-admin-20261110` a été construite pour ce changement.
+
+Le compte est préparé à l’école, mais la nouvelle image n’y est pas encore publiée ni déployée ; les trois Deployments école restent à zéro réplique. Les modifications de code ne sont pas encore committées ou poussées.

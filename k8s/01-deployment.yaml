@@ -25,7 +25,7 @@ spec:
       terminationGracePeriodSeconds: 25
       containers:
         - name: photo-service
-          image: photo-service:v2.0.0
+          image: photo-service:v2.1.0
           imagePullPolicy: IfNotPresent
           lifecycle:
             preStop:
@@ -34,6 +34,11 @@ spec:
           ports:
             - name: http
               containerPort: 3000
+          envFrom:
+            - prefix: AUTH_
+              secretRef:
+                name: photo-auth
+                optional: true
           env:
             - name: PGHOST
               value: photo-db

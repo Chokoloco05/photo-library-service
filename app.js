@@ -3,6 +3,7 @@ const { createIdentity } = require('./identity');
 const path = require('node:path');
 const { readFileSync } = require('node:fs');
 const { analyze, duplicates, similar, MAX_BYTES } = require('./photos');
+const { createAuth } = require('./auth');
 
 function createApp(options = {}) {
   const app = express();
@@ -11,6 +12,8 @@ function createApp(options = {}) {
   const database = options.database;
   const basePath = (options.basePath ?? (options.env || process.env).APP_BASE_PATH ?? '').replace(/\/$/, '');
   if (basePath && !/^\/[a-zA-Z0-9/_-]+$/.test(basePath)) throw new Error('Invalid APP_BASE_PATH');
+  if ((options.env || process.env).AUTH_TRUST_PROXY === 'true') app.set('trust proxy', 1);
+  const auth = createAuth({ database, basePath, env: options.env || process.env, config: options.auth });
   const html = readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8')
     .replace('<base href="/">', `<base href="${basePath}/">`);
   let uploads = 0;
@@ -57,6 +60,12 @@ function createApp(options = {}) {
     }
     next();
   });
+  app.get('/api/auth/session', auth.status);
+  app.post('/api/auth/login', auth.sameOrigin, express.json({ limit: '2kb' }), auth.login);
+  app.post('/api/auth/logout', auth.requireWrite, auth.logout);
+  // All library mutations are protected before parsing upload bodies or invoking SQL.
+  app.use('/api', (req, res, next) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method)
+    ? next() : auth.requireWrite(req, res, next));
   const list = async () => {
     const photos = await database.list();
     if (photos.length > 2000) throw Object.assign(new Error('Cette version prend en charge 2 000 photos maximum. Réduis la bibliothèque avant une nouvelle analyse.'), { status: 409 });

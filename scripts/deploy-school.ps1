@@ -76,6 +76,8 @@ try {
         $deployment.spec.template.metadata.labels.app = $appName
         $deployment.spec.template.metadata.labels | Add-Member -Force -NotePropertyName environment -NotePropertyValue $Environment
         $container = $deployment.spec.template.spec.containers[0]
+        # One administrator configuration is shared by Dev, Test and Production.
+        $container.envFrom[0].secretRef.name = 'photo-auth'
         $container.image = if ($Image) { $Image } else { 'ghcr.io/chokoloco05/photo-library-service:must-be-rendered' }
         foreach ($entry in $container.env) {
             if ($entry.name -eq 'APP_ENV') { $entry.value = $Environment }

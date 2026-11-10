@@ -2,6 +2,8 @@
 
 État de référence : 6 novembre 2026. Les résultats détaillés sont regroupés dans [validation.md](validation.md#ecole).
 
+Mise à jour du 10 novembre : l'API et les trois environnements ont été vérifiés accessibles en HTTP ; le domaine se résout désormais. HTTPS échoue encore lors de la négociation TLS. Les Deployments applicatifs ont ensuite été mis à zéro réplique pendant la préparation de la version 2.1 avec authentification ; les bases et volumes sont conservés. Le pipeline et l'image authentifiée n'ont pas encore été publiés. Le compte admin commun est configuré dans `team5/photo-auth`, avec HTTP de démonstration explicitement autorisé sur le domaine école. Les descriptions et nombres ci-dessous correspondent à la validation antérieure.
+
 ## Organisation demandée par le professeur
 
 Tous les environnements sont dans le namespace **`team5`**. Kubernetes ne permet pas de namespaces imbriqués : Dev/Test/Prod sont différenciés par leurs noms, labels, Services, Secrets et bases. Cette séparation des données n'est pas une barrière de sécurité entre comptes ayant les mêmes droits sur `team5`.
@@ -114,4 +116,4 @@ Pour déplacer Headlamp et son scaling, demander un compte dédié et ses bindin
 
 Le workflow déploie encore Test sur Docker Desktop avant de publier sur GHCR. Le déploiement de l'école a été effectué séparément ; la promotion Test vers Production après validation reste à automatiser, avec accès école dans un Secret GitHub et promotion du même digest.
 
-Conserver les services et volumes locaux jusqu'à validation de l'accès distant et transfert des données à garder. La réplication/sharding PostgreSQL, le cache répliqué et le rafraîchissement de la base Test restent des fonctionnalités à ajouter. La bibliothèque reste partagée sans comptes applicatifs : prévoir un contrôle d'accès et HTTPS avant d'exposer des photos privées.
+Conserver les services et volumes locaux jusqu'à validation de l'accès distant et transfert des données à garder. La réplication/sharding PostgreSQL, le cache répliqué et le rafraîchissement de la base Test restent des fonctionnalités à ajouter. La nouvelle version protège les mutations avec un compte administrateur : voir [configuration](application.md#compte-administrateur-commun). La consultation reste publique ; Le mode HTTP de démonstration permet la connexion sur le domaine école avec le compte admin commun ; les échanges restent non chiffrés. HTTPS reste nécessaire pour un usage réel.

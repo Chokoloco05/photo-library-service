@@ -27,6 +27,11 @@ spec:
         ports:
         - name: http
           containerPort: 3000
+        envFrom:
+        - prefix: AUTH_
+          secretRef:
+            name: photo-auth
+            optional: true
         env:
         - name: PGHOST
           value: photo-db
