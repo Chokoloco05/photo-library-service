@@ -39,6 +39,8 @@ Avec Docker Desktop et Kubernetes démarrés, suivre le [lancement](docs/applica
 - Test : http://test.localhost/
 - Headlamp : http://dashboard.localhost/ — [connexion et scaling](docs/infrastructure.md#monitoring-et-milestone-3).
 
+Grafana et Prometheus sont installés localement avec la version 2.2.0 en préparation. Le [guide de supervision](docs/infrastructure.md#prometheus-et-grafana) décrit les graphiques, la collecte et le trafic de démonstration. Ouvrir [le dashboard Clair](http://grafana.localhost/d/clair/clair).
+
 ## Structure du dépôt
 
 | Emplacement | Rôle |

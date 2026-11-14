@@ -4,12 +4,15 @@ const path = require('node:path');
 const { readFileSync } = require('node:fs');
 const { analyze, duplicates, similar, MAX_BYTES } = require('./photos');
 const { createAuth } = require('./auth');
+const { createMetrics } = require('./metrics');
 
 function createApp(options = {}) {
   const app = express();
   const identity = createIdentity(options);
   app.locals.identity = identity;
   const database = options.database;
+  app.locals.metrics = createMetrics(identity, database);
+  app.use(app.locals.metrics.middleware);
   const basePath = (options.basePath ?? (options.env || process.env).APP_BASE_PATH ?? '').replace(/\/$/, '');
   if (basePath && !/^\/[a-zA-Z0-9/_-]+$/.test(basePath)) throw new Error('Invalid APP_BASE_PATH');
   if ((options.env || process.env).AUTH_TRUST_PROXY === 'true') app.set('trust proxy', 1);
@@ -125,6 +128,7 @@ function createApp(options = {}) {
   const mounted = express();
   mounted.disable('x-powered-by');
   mounted.locals.identity = identity;
+  mounted.locals.metrics = app.locals.metrics;
   mounted.use(basePath, app);
   return mounted;
 }

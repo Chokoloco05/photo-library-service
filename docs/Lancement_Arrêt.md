@@ -1,65 +1,162 @@
-//////// Lancement :
+# Lancement et arrêt du projet
 
-# 1. Vérifier le cluster local
->> kubectl --context docker-desktop get nodes
+Exécuter les commandes PowerShell **depuis la racine du projet**. Ce guide relance l'installation existante ; il ne reconstruit pas les images et ne déploie pas une nouvelle version.
 
-# 2. Relancer PostgreSQL
->> kubectl --context docker-desktop scale statefulset/photo-db -n dev --replicas=1
->> kubectl --context docker-desktop scale statefulset/photo-db -n test --replicas=1
+Le cluster local et celui de l'école sont indépendants : **quitter Docker Desktop n'arrête pas le site de l'école**.
 
-# 3. Attendre les bases
->> kubectl --context docker-desktop rollout status statefulset/photo-db -n dev --timeout=180s
->> kubectl --context docker-desktop rollout status statefulset/photo-db -n test --timeout=180s
+## Local : tout lancer
 
-# 4. Relancer le contrôleur Ingress
->> kubectl --context docker-desktop scale deployment/traefik -n photo-ingress --replicas=1
+Démarrer Docker Desktop et attendre que Kubernetes soit prêt, puis :
 
-# 5. Relancer les applications
->> kubectl --context docker-desktop scale deployment/photo-service -n dev --replicas=3
->> kubectl --context docker-desktop scale deployment/photo-service -n test --replicas=3
+```powershell
+# 1. Vérifier le cluster
+kubectl --context docker-desktop get nodes
 
-# 6. Attendre les applications
->> kubectl --context docker-desktop rollout status deployment/photo-service -n dev --timeout=240s
->> kubectl --context docker-desktop rollout status deployment/photo-service -n test --timeout=240s
+# 2. Relancer les bases et attendre leur disponibilité
+kubectl --context docker-desktop -n dev scale statefulset/photo-db --replicas=1
+kubectl --context docker-desktop -n test scale statefulset/photo-db --replicas=1
+kubectl --context docker-desktop -n dev rollout status statefulset/photo-db --timeout=240s
+kubectl --context docker-desktop -n test rollout status statefulset/photo-db --timeout=240s
 
-# 7. Relancer le monitoring
->> kubectl --context docker-desktop scale deployment/metrics-server -n kube-system --replicas=1
->> kubectl --context docker-desktop scale deployment/headlamp -n monitoring --replicas=1
+# 3. Relancer le contrôleur Ingress
+kubectl --context docker-desktop -n photo-ingress scale deployment/traefik --replicas=1
+kubectl --context docker-desktop -n photo-ingress rollout status deployment/traefik --timeout=180s
 
-# 8. Attendre le monitoring
->> kubectl --context docker-desktop rollout status deployment/metrics-server -n kube-system --timeout=180s
->> kubectl --context docker-desktop rollout status deployment/headlamp -n monitoring --timeout=180s
+# 4. Relancer les applications
+kubectl --context docker-desktop -n dev scale deployment/photo-service --replicas=3
+kubectl --context docker-desktop -n test scale deployment/photo-service --replicas=3
+kubectl --context docker-desktop -n dev rollout status deployment/photo-service --timeout=240s
+kubectl --context docker-desktop -n test rollout status deployment/photo-service --timeout=240s
 
-# 9. Démarrer le runner GitHub
->> powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Start
+# 5. Relancer les métriques et le dashboard
+kubectl --context docker-desktop -n kube-system scale deployment/metrics-server --replicas=1
+kubectl --context docker-desktop -n monitoring scale deployment/headlamp --replicas=1
+kubectl --context docker-desktop -n kube-system rollout status deployment/metrics-server --timeout=180s
+kubectl --context docker-desktop -n monitoring rollout status deployment/headlamp --timeout=180s
 
-# 10. Afficher le token de connexion Headlamp
->> kubectl --context docker-desktop -n monitoring create token photo-operator --duration=1h
+# 6. Relancer Prometheus et Grafana après leur première installation
+kubectl --context docker-desktop -n monitoring scale statefulset/prometheus statefulset/grafana --replicas=1
+kubectl --context docker-desktop -n monitoring rollout status statefulset/prometheus --timeout=300s
+kubectl --context docker-desktop -n monitoring rollout status statefulset/grafana --timeout=300s
 
-Dev : http://localhost/
-Test : http://test.localhost/
-Dashboard : http://dashboard.localhost/
+# 7. Relancer le runner pour les prochains pipelines GitHub
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Start
+```
 
-///////// Arrêt :
+| Service local | Adresse |
+| --- | --- |
+| Dev | http://localhost/ |
+| Test | http://test.localhost/ |
+| Dashboard Headlamp | http://dashboard.localhost/ |
+| Graphiques Grafana | http://grafana.localhost/d/clair/clair |
+| Collecte Prometheus | http://prometheus.localhost/targets |
 
-# 1. Arrêter le runner GitHub
->> powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Stop
+Pour la première installation des graphiques, suivre le [guide Prometheus et Grafana](infrastructure.md#prometheus-et-grafana).
 
-# 2. Arrêter les applications
->> kubectl --context docker-desktop scale deployment/photo-service -n dev --replicas=0
->> kubectl --context docker-desktop scale deployment/photo-service -n test --replicas=0
+Pour afficher un jeton temporaire Headlamp, à copier manuellement :
 
-# 3. Attendre leur arrêt avant de couper les bases
->> kubectl --context docker-desktop wait --for=delete pod -l app=photo-service -n dev --timeout=180s
->> kubectl --context docker-desktop wait --for=delete pod -l app=photo-service -n test --timeout=180s
+```powershell
+kubectl --context docker-desktop -n monitoring create token photo-operator --duration=1h
+```
 
-# 4. Arrêter PostgreSQL
->> kubectl --context docker-desktop scale statefulset/photo-db -n dev --replicas=0
->> kubectl --context docker-desktop scale statefulset/photo-db -n test --replicas=0
+Ce jeton sert au dashboard Kubernetes, pas à la connexion admin de Clair. Ne pas le partager ni le conserver dans Git.
 
-# 5. Arrêter le dashboard et les métriques
->> kubectl --context docker-desktop scale deployment/headlamp -n monitoring --replicas=0
->> kubectl --context docker-desktop scale deployment/metrics-server -n kube-system --replicas=0
+## Local : tout arrêter
 
-# 6. Arrêter Traefik
->> kubectl --context docker-desktop scale deployment/traefik -n photo-ingress --replicas=0
+Attendre la fin des jobs GitHub. Si le script refuse l'arrêt du runner parce qu'un job est actif, attendre sa fin avant de poursuivre.
+
+```powershell
+# 1. Arrêter le runner
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Stop
+
+# 2. Arrêter les applications avant leurs bases
+kubectl --context docker-desktop -n dev scale deployment/photo-service --replicas=0
+kubectl --context docker-desktop -n test scale deployment/photo-service --replicas=0
+kubectl --context docker-desktop -n dev wait --for=delete pod -l app=photo-service --timeout=180s
+kubectl --context docker-desktop -n test wait --for=delete pod -l app=photo-service --timeout=180s
+
+# 3. Arrêter les bases
+kubectl --context docker-desktop -n dev scale statefulset/photo-db --replicas=0
+kubectl --context docker-desktop -n test scale statefulset/photo-db --replicas=0
+
+# 4. Arrêter les dashboards, les métriques et Traefik
+kubectl --context docker-desktop -n monitoring scale statefulset/prometheus statefulset/grafana --replicas=0
+kubectl --context docker-desktop -n monitoring scale deployment/headlamp --replicas=0
+kubectl --context docker-desktop -n kube-system scale deployment/metrics-server --replicas=0
+kubectl --context docker-desktop -n photo-ingress scale deployment/traefik --replicas=0
+```
+
+Terminer par **Quit Docker Desktop** depuis son icône près de l'horloge pour arrêter aussi le cluster local. Les photos, volumes et comptes sont conservés. Ne pas supprimer de PVC, Secret ou namespace pour un simple arrêt.
+
+## École : accès et vérification
+
+Les applications de l'école restent en service même si le PC ou Docker Desktop est éteint. Aucun lancement local n'est nécessaire pour ouvrir ces sites :
+
+| Environnement | Adresse |
+| --- | --- |
+| Dev | http://team5.laboinfo-ecam.be/dev/ |
+| Test | http://team5.laboinfo-ecam.be/test/ |
+| Production | http://team5.laboinfo-ecam.be/ |
+
+Pour vérifier les ressources, sans les modifier :
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-school.ps1 -Action Check
+```
+
+Le kubeconfig privé `school_cluster/team5_cluster_info.yaml` est nécessaire aux commandes d'administration école. Il n'est pas nécessaire pour consulter le site dans un navigateur.
+
+### École : arrêter ou relancer seulement les applications
+
+Les bases et volumes restent démarrés. Ne pas modifier la Gateway partagée de l'école. Le compte `team5` n'ayant pas accès à `deployments/scale`, la procédure modifie `spec.replicas` par un patch de Deployment.
+
+Définir d'abord cette fonction dans PowerShell ; elle ne change rien tant qu'elle n'est pas appelée :
+
+```powershell
+function Set-SchoolApplications {
+    param([Parameter(Mandatory = $true)][ValidateSet(0, 3)][int]$Replicas)
+
+    $patchFile = [IO.Path]::GetTempFileName()
+    try {
+        [IO.File]::WriteAllText($patchFile, (@{spec=@{replicas=$Replicas}} | ConvertTo-Json -Compress))
+        foreach ($environment in @('dev', 'test', 'prod')) {
+            kubectl --kubeconfig .\school_cluster\team5_cluster_info.yaml -n team5 patch deployment "photo-service-$environment" --type merge --patch-file $patchFile
+            if ($LASTEXITCODE -ne 0) { throw "Modification interrompue pour $environment" }
+        }
+    } finally {
+        Remove-Item -LiteralPath $patchFile -ErrorAction SilentlyContinue
+    }
+}
+```
+
+Pour arrêter les trois applications école :
+
+```powershell
+Set-SchoolApplications -Replicas 0
+```
+
+Pour les relancer avec les images déjà déployées :
+
+```powershell
+Set-SchoolApplications -Replicas 3
+foreach ($environment in @('dev', 'test', 'prod')) {
+    kubectl --kubeconfig .\school_cluster\team5_cluster_info.yaml -n team5 rollout status "deployment/photo-service-$environment" --timeout=300s
+    if ($LASTEXITCODE -ne 0) { throw "Environnement non prêt : $environment" }
+}
+```
+
+Les chemins concernés répondront HTTP 503 pendant l'arrêt. Pour **déployer une nouvelle image**, suivre le [guide école](ecole.md#préparer-et-déployer) ; relancer les répliques ne récupère pas automatiquement les derniers changements GitHub.
+
+## Connexion admin : un seul compte partout
+
+Les photos sont visibles sans connexion. Utiliser **Se connecter**, l'identifiant **`admin`** et le mot de passe choisi en Dev pour importer, modifier ou supprimer. Le compte commun est déjà configuré ; ne pas le recréer après chaque redémarrage.
+
+Pour changer ultérieurement ce mot de passe **une seule fois pour tous les environnements**, utiliser la saisie masquée :
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\configure-auth.ps1 -ChangePassword -DemoHttp
+```
+
+Cette commande nécessite l'accès aux deux clusters et redémarre les Pods existants pour charger le nouveau hachage, sans changer le nombre de répliques. Les sessions précédentes sont invalidées après remplacement des anciens Pods. Détails : [compte commun](application.md#compte-administrateur-commun).
+
+Le site école utilise actuellement **HTTP en mode démonstration** : les identifiants et sessions transitent sans chiffrement. Réserver ce mot de passe au projet et utiliser des photos non sensibles. Le mot de passe n'est pas écrit dans ce document.

@@ -83,7 +83,7 @@ Dev, depuis la racine du projet avec Docker Desktop et Kubernetes démarrés :
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-docker-desktop.ps1
 ```
 
-Le script construit `photo-service:v2.1.0`, installe la base Dev si nécessaire, puis déploie trois Pods applicatifs. Pour Test, le pipeline GitHub existant construit une image unique puis appelle `deploy-test.ps1`, qui prépare désormais aussi la base Test.
+Le script construit `photo-service:v2.2.0`, installe la base Dev si nécessaire, puis déploie trois Pods applicatifs. Pour Test, le pipeline GitHub existant construit une image unique puis appelle `deploy-test.ps1`, qui prépare désormais aussi la base Test.
 
 `scripts/database.ps1` crée un mot de passe aléatoire par environnement dans le Secret Kubernetes `photo-db`. Il conserve le Secret existant à chaque lancement. Ne pas supprimer ce Secret indépendamment du PVC : le mot de passe du PostgreSQL déjà initialisé ne changerait pas automatiquement.
 

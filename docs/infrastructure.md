@@ -23,7 +23,7 @@ Navigateur -> Traefik partagé -> règle Ingress -> Service -> 3 Pods Express
 
 Le milestone 1 a commencé avec une API fictive sans base. La version actuelle héberge Clair et PostgreSQL. Trois Pods sur un nœud démontrent la réplication applicative, pas la résistance à une panne du PC. Les bases Dev/Test sont indépendantes ; ce ne sont pas des réplicas PostgreSQL.
 
-Le [Dockerfile](../Dockerfile) installe les dépendances dans un premier stage puis copie l'application, les ressources web et les migrations dans un runtime non-root. `package-lock.json` est indispensable pour reproduire l'installation. `EXPOSE 3000` documente le port et ne le publie pas à lui seul.
+Le [Dockerfile](../Dockerfile) installe les dépendances dans un premier stage puis copie l'application, les ressources web et les migrations dans un runtime non-root. `package-lock.json` est indispensable pour reproduire l'installation. `EXPOSE 3000 9090` documente les ports applicatif et de métriques. Leur exposition réseau dépend des Services.
 
 ### Vérifier l'Ingress et les répliques
 
@@ -132,6 +132,31 @@ Le jeton expire après une heure. Le compte opérateur est distinct du serveur H
 Il s'agit de scaling horizontal manuel. Aucun HPA n'est configuré. Un prochain apply peut rétablir `replicas: 3`. Metrics Server ne conserve pas d'historique durable et ne remplace pas une chaîne d'alerting.
 
 À l'école, les droits de métriques, de ServiceAccount/RBAC et de `deployments/scale` restent à obtenir : voir [ecole.md](ecole.md).
+
+## Prometheus et Grafana
+
+La version locale 2.2.0 exporte ses métriques sur le port interne 9090. Prometheus 3.16.0 découvre chaque Pod Dev/Test par les Services DNS headless et collecte toutes les 15 secondes. Les changements du nombre de répliques sont découverts automatiquement. Le chemin applicatif public `/metrics` répond HTTP 404.
+
+Installer ou actualiser depuis la racine du projet, avec Docker Desktop et les comptes applicatifs déjà configurés.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\observability.ps1 -Action Install
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\observability.ps1 -Action Check
+```
+
+Ouvrir [Grafana](http://grafana.localhost/d/clair/clair), puis choisir Dev, Test ou les deux. Les dix panneaux présentent les instances collectées, la disponibilité PostgreSQL, le débit, les erreurs HTTP, la latence p95, le CPU et la mémoire du processus Node.js. Le CPU est exprimé en cœurs et la mémoire correspond au RSS du processus. `up` indique que la collecte répond et `photo_database_up` vérifie PostgreSQL avec `SELECT 1`. La latence p95 est estimée à partir des tranches de l’histogramme.
+
+Grafana 13.3.1 autorise la consultation locale anonyme avec le rôle Viewer. L’administration est protégée par un mot de passe aléatoire conservé dans le Secret `grafana-admin`. Les graphiques et la source Prometheus sont provisionnés depuis [le dashboard JSON](../infra/monitoring/clair-dashboard.json) et [les manifestes](../infra/monitoring/observability.yaml). Headlamp conserve les commandes de scaling Kubernetes.
+
+Prometheus possède un PVC de 2 Gio et une rétention de sept jours, plafonnée à 1 Go de blocs. Grafana possède un PVC de 1 Gio. Les commandes du [guide de lancement et d’arrêt](Lancement_Arrêt.md) conservent ces volumes. Cette installation concerne le cluster local. Le déploiement du monitoring à l’école reste à préparer avec les droits disponibles dans `team5`.
+
+Pour créer des courbes avec des lectures de statistiques pendant une minute, sans modifier les photos, lancer la commande suivante puis observer Grafana.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\observability.ps1 -Action Load -DurationSeconds 60 -RequestsPerSecond 8
+```
+
+La [page des cibles Prometheus](http://prometheus.localhost/targets) permet de vérifier la collecte. Attendre deux collectes pour afficher les débits et le p95 après un redémarrage. La [capture validée](evidence/grafana-clair.png) illustre les courbes obtenues.
 
 ## Dépannage commun
 

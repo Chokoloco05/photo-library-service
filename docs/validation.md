@@ -296,3 +296,17 @@ Cette validation remplace les états précédents indiquant l'arrêt des applica
 - Les tests locaux avec PostgreSQL et Chrome ont validé le parcours authentifié. La navigation Chrome automatisée vers le domaine distant a renvoyé `ERR_BLOCKED_BY_CLIENT` ; les vérifications distantes ont été effectuées au niveau HTTP/API. Aucune validation visuelle distante n'est revendiquée.
 
 Les [résultats structurés](evidence/school-auth-release-2026-11-10.json) conservent les contrôles et la version sans secret. Ce déploiement depuis des applications arrêtées ne constitue pas une démonstration mesurée de zéro interruption.
+
+
+## Prometheus et Grafana locaux — 14 novembre 2026
+
+- Version locale 2.2.0, Prometheus 3.16.0 et Grafana 13.3.1 installés sur Docker Desktop. Les six Pods Dev/Test, leurs deux bases, Metrics Server et Headlamp sont prêts.
+- Les 29 tests réussissent avec une base PostgreSQL temporaire isolée, aucun test ignoré. Cette base temporaire a ensuite été arrêtée et supprimée.
+- Prometheus collecte les six instances applicatives. La découverte DNS a été exercée avec une montée de Dev à cinq répliques, puis un retour à trois. Le contrôle final confirme six cibles saines pour six répliques attendues.
+- Deux phases de charge en lecture ont produit 1 200 requêtes HTTP, sans erreur.
+- Le dashboard provisionné comporte dix panneaux. La source Grafana retourne six instances disponibles. Chrome affiche les six graphiques temporels sans erreur JavaScript observée.
+- Les PVC Prometheus de 2 Gio et Grafana de 1 Gio sont Bound. La rétention Prometheus est de sept jours, plafonnée à 1 Go de blocs.
+- La consultation Grafana locale est ouverte en lecture avec le rôle Viewer. Le port de métriques applicatif 9090 reste interne et `/metrics` sur le site public répond HTTP 404.
+- Le monitoring reste local et la version école publiée reste 2.1.0. Les changements 2.2.0 sont préparés dans le dossier de travail.
+
+[Capture du dashboard et de ses courbes](evidence/grafana-clair.png).
