@@ -50,7 +50,10 @@ try {
             Invoke-Database @('createdb', '-U', 'photo', '--template=template0', $exportDatabase)
             $exportCreated = $true
             Invoke-DatabaseScript $exportDatabase 'CREATE TABLE schema_migrations(version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now());' | Out-Null
-            foreach ($migration in (Get-ChildItem -LiteralPath (Join-Path $projectRoot 'migrations') -Filter '*.sql' | Where-Object { $_.Name -match '^\d+[-\w]*\.sql$' } | Sort-Object Name)) {
+            $versions = @(Invoke-Database @('psql', '-X', '-U', 'photo', '-d', 'photo_service', '-Atc', 'SELECT version FROM schema_migrations ORDER BY version;'))
+            $migrations = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'migrations') -Filter '*.sql' | Where-Object { $_.Name -in $versions } | Sort-Object Name)
+            if ($migrations.Count -ne $versions.Count) { throw 'Source migration files are missing from the repository.' }
+            foreach ($migration in $migrations) {
                 Invoke-DatabaseScript $exportDatabase (Get-Content -LiteralPath $migration.FullName -Raw) | Out-Null
             }
             $exportSql = @'
@@ -58,17 +61,22 @@ CREATE EXTENSION postgres_fdw;
 CREATE SCHEMA backup_source;
 CREATE SERVER backup_source FOREIGN DATA WRAPPER postgres_fdw OPTIONS(host '/var/run/postgresql',dbname 'photo_service');
 CREATE USER MAPPING FOR photo SERVER backup_source OPTIONS(user 'photo');
-IMPORT FOREIGN SCHEMA public LIMIT TO(photos,schema_migrations,auth_sessions,auth_attempts) FROM SERVER backup_source INTO backup_source;
+IMPORT FOREIGN SCHEMA public LIMIT TO(photos,schema_migrations,auth_sessions,auth_attempts,library_revision) FROM SERVER backup_source INTO backup_source;
 BEGIN ISOLATION LEVEL REPEATABLE READ;
 INSERT INTO public.photos SELECT * FROM backup_source.photos;
 INSERT INTO public.schema_migrations SELECT * FROM backup_source.schema_migrations;
 INSERT INTO public.auth_sessions SELECT * FROM backup_source.auth_sessions;
 INSERT INTO public.auth_attempts SELECT * FROM backup_source.auth_attempts;
+TRUNCATE public.library_revision;
+INSERT INTO public.library_revision SELECT * FROM backup_source.library_revision;
 COMMIT;
 DROP SCHEMA backup_source CASCADE;
 DROP SERVER backup_source CASCADE;
 DROP EXTENSION postgres_fdw;
 '@
+            if ('004-library-revision.sql' -notin $versions) {
+                $exportSql = $exportSql.Replace(',library_revision', '').Replace('TRUNCATE public.library_revision;', '').Replace('INSERT INTO public.library_revision SELECT * FROM backup_source.library_revision;', '')
+            }
             Invoke-DatabaseScript $exportDatabase $exportSql | Out-Null
             $sourceDatabase = $exportDatabase
         }

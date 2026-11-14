@@ -298,6 +298,20 @@ Cette validation remplace les états précédents indiquant l'arrêt des applica
 Les [résultats structurés](evidence/school-auth-release-2026-11-10.json) conservent les contrôles et la version sans secret. Ce déploiement depuis des applications arrêtées ne constitue pas une démonstration mesurée de zéro interruption.
 
 
+## Cache Redis répliqué local — 14 novembre 2026
+
+- Redis 8.10.3 est installé dans Dev et Test, avec un primaire authentifié et un réplica en lecture seule par environnement. Chaque instance possède son PVC de 1 Gio.
+- La version locale 2.4.0 et la migration additive `004-library-revision.sql` sont déployées dans les six Pods applicatifs. Les trois milestones et le script de déploiement Test conservent leurs points d'entrée.
+- Les trente-trois tests passent avec PostgreSQL et Redis temporaires, aucun test ignoré. Les scénarios supplémentaires vérifient le partage entre instances, les imports/modifications/suppressions, les versions de cache, l'expiration, les lectures pendant une panne et la protection contre une réponse ancienne chargée en parallèle d'une modification.
+- `cache.ps1 -Action Exercise` a confirmé la copie des clés, le refus d'écriture sur les réplicas et le rattrapage après leur redémarrage dans les deux environnements.
+- L'arrêt complet du cache Dev a laissé l'API de statistiques disponible en HTTP 200 avec quatre photos et une readiness valide. Redis a ensuite été relancé avec ses deux Pods et les connexions applicatives ont repris.
+- Une phase de 240 lectures HTTP a terminé sans erreur. Prometheus confirme six connexions Redis prêtes et des événements `hit` dans Dev et Test.
+- Grafana provisionne douze panneaux, dont la connexion et les événements du cache. Chrome affiche les huit graphiques temporels sans erreur JavaScript observée. La [capture Redis](evidence/grafana-cache.png) montre les nouveaux panneaux.
+- Les sauvegardes préalables ont restauré les bases avec trois migrations. Après déploiement, les sauvegardes Dev et Test se restaurent avec quatre migrations, respectivement quatre photos et zéro photo, et conservent la version de bibliothèque.
+- Le workflow GitHub inclut désormais un Redis temporaire pour exécuter les tests d'intégration lors de la prochaine publication.
+
+Cette évolution est locale et reste à publier. La réplication Redis est asynchrone, avec retour aux lectures PostgreSQL en cas de panne du cache. Le basculement automatique et le déploiement de Redis à l'école restent à préparer.
+
 ## Sharding PostgreSQL local — 14 novembre 2026
 
 - La version locale 2.3.0 utilise deux shards physiques par environnement Dev/Test, chacun avec son réplica. Huit instances PostgreSQL et huit PVC de 2 Gio sont déployés au total.

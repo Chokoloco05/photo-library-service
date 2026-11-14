@@ -31,7 +31,7 @@ test('PostgreSQL migrations and shared library lifecycle across two application 
     await database.pool.query('INSERT INTO photos(id,filename,title,mime_type,size_bytes,width,height,sha256,visual_hash,original,thumbnail) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
       [legacy.id, legacy.filename, legacy.title, legacy.mime_type, legacy.size_bytes, legacy.width, legacy.height, legacy.sha256, legacy.visual_hash, legacy.original, legacy.thumbnail]);
     await Promise.all([database.migrate(), otherDatabase.migrate()]);
-    assert.equal((await database.pool.query('SELECT * FROM schema_migrations')).rowCount, 3);
+    assert.equal((await database.pool.query('SELECT * FROM schema_migrations')).rowCount, 4);
     const migrated = (await otherDatabase.list())[0];
     assert.equal(migrated.id, legacy.id); assert.equal(migrated.description, '');
     assert.deepEqual((await otherDatabase.image(legacy.id, false)).data, legacy.original);

@@ -108,6 +108,36 @@ Pour exercer le redémarrage et le rattrapage du réplica du second shard, utili
 
 Cette architecture est déployée localement. Sa transposition à `team5` et les ressources correspondantes restent à préparer. Les choix SQL s'appuient sur les mécanismes PostgreSQL de partitionnement et de tables étrangères. [Partitionnement](https://www.postgresql.org/docs/17/ddl-partitioning.html), [postgres_fdw](https://www.postgresql.org/docs/17/postgres-fdw.html).
 
+## Cache Redis répliqué local
+
+La version 2.4.0 utilise Redis 8.10.3 avec un primaire `photo-cache-0` et un réplica en lecture seule `photo-cache-1` dans chaque environnement Dev/Test. Le StatefulSet `photo-cache` possède deux Pods et deux PVC de 1 Gio. L'authentification utilise un mot de passe aléatoire par namespace, conservé dans le Secret `photo-cache`. Le port 6379 est accessible via les Services internes du cluster.
+
+Les listes de photos, statistiques, doublons et comparaisons sont mis en cache pendant quinze secondes. Les fichiers image, les sessions et les décisions d'autorisation suivent leurs accès PostgreSQL existants. Les imports vérifient directement la limite de capacité dans PostgreSQL.
+
+La migration `004-library-revision.sql` ajoute une version UUID de la bibliothèque. Un trigger la renouvelle à chaque INSERT, UPDATE, DELETE ou TRUNCATE de la table logique `photos`, dans la transaction SQL. Une lecture récupère cette version avec une requête légère, puis utilise une clé Redis qui contient l'environnement, la version et le type de résultat. Les anciennes réponses expirent et une lecture commencée avant une modification ne remplace pas les résultats de la nouvelle version. Cette stratégie couvre les différents Pods applicatifs et les écritures effectuées pendant une indisponibilité Redis.
+
+Les lectures et écritures du cache utilisent le primaire Redis. La réplication est asynchrone. Le cache dispose d'un AOF synchronisé chaque seconde, d'une limite mémoire de 64 Mio et d'une éviction LRU. Si Redis est déconnecté, saturé ou ne répond pas dans le délai de 200 ms par commande, l'application charge les données depuis PostgreSQL. La readiness applicative reste fondée sur les bases de données. Le basculement automatique Redis reste à réaliser.
+
+```powershell
+.\scripts\cache.ps1 -Namespace dev -Action Install
+.\scripts\cache.ps1 -Namespace test -Action Install
+.\scripts\cache.ps1 -Namespace dev -Action Check
+.\scripts\cache.ps1 -Namespace test -Action Check
+```
+
+Les scripts habituels de lancement Dev, de déploiement Test et d'installation de la supervision appellent l'installation du cache. Le Secret et les PVC existants sont réutilisés. Les commandes du [guide de lancement et d'arrêt](Lancement_Arrêt.md) remettent le StatefulSet à deux Pods ou à zéro.
+
+Pour vérifier la copie d'une clé de test, le refus d'écriture sur le réplica et son rattrapage après arrêt, lancer l'exercice suivant. La clé de vérification est supprimée à la fin et possède également une expiration.
+
+```powershell
+.\scripts\cache.ps1 -Namespace dev -Action Exercise
+.\scripts\cache.ps1 -Namespace test -Action Exercise
+```
+
+Grafana affiche la connexion au cache et les événements `hit`, `miss`, `bypass` et `error`. `hit` correspond à une réponse trouvée en cache, `miss` à un chargement, `bypass` à une lecture directe et `error` à un incident Redis ou à une entrée invalide. Un incident d'écriture peut être comptabilisé après un miss. Les métriques Prometheus sont `photo_cache_up` et `photo_cache_events_total`.
+
+Cette installation est locale. Les mécanismes Redis sont décrits dans les documentations officielles. [Réplication Redis](https://redis.io/docs/latest/operate/oss_and_stack/management/replication/), [client Node.js](https://redis.io/docs/latest/develop/clients/nodejs/connect/).
+
 ## Pipeline GitHub et milestone 2
 
 Source de vérité : [test-pipeline.yml](../.github/workflows/test-pipeline.yml).
@@ -119,7 +149,7 @@ main -> mêmes tests -> build et rollout Test local -> publication privée GHCR
 
 - Les pull requests ne déploient pas.
 - `needs` bloque les jobs suivants si les tests ou le déploiement Test échouent.
-- Les tests tournent sur un runner GitHub hébergé. `TEST_DATABASE_URL` active l'intégration SQL sur le PostgreSQL temporaire du job, distinct de la base Test Kubernetes.
+- Les tests tournent sur un runner GitHub hébergé. `TEST_DATABASE_URL` active l'intégration SQL sur le PostgreSQL temporaire du job. `TEST_REDIS_URL` active les tests de cache sur le Redis temporaire du job. Ces services sont isolés des environnements Kubernetes.
 - Le runner Windows `photo-desktop`, labels `self-hosted`, `Windows`, `X64`, `photo-local`, construit une image unique et déploie dans Docker Desktop.
 - Le tag contient le SHA du commit, le run et sa tentative ; `APP_REVISION` permet de retrouver le commit réellement servi.
 - [deploy-test.ps1](../scripts/deploy-test.ps1) remplace le tag provisoire avant apply, prépare la base, attend le rollout et vérifie six réponses de `/api/info`, puis `/healthz`.
@@ -216,7 +246,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\observability.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\observability.ps1 -Action Check
 ```
 
-Ouvrir [Grafana](http://grafana.localhost/d/clair/clair), puis choisir Dev, Test ou les deux. Les dix panneaux présentent les instances collectées, la disponibilité PostgreSQL, le débit, les erreurs HTTP, la latence p95, le CPU et la mémoire du processus Node.js. Le CPU est exprimé en cœurs et la mémoire correspond au RSS du processus. `up` indique que la collecte répond et `photo_database_up` vérifie PostgreSQL avec `SELECT 1`. La latence p95 est estimée à partir des tranches de l’histogramme.
+Ouvrir [Grafana](http://grafana.localhost/d/clair/clair), puis choisir Dev, Test ou les deux. Les douze panneaux présentent les instances collectées, la disponibilité PostgreSQL, le débit, les erreurs HTTP, la latence p95, le CPU et la mémoire du processus Node.js ainsi que la connexion et les événements du cache. Le CPU est exprimé en cœurs et la mémoire correspond au RSS du processus. `up` indique que la collecte répond. `photo_database_up` vérifie le coordinateur et l'accès au shard distant dans une installation shardée. La latence p95 est estimée à partir des tranches de l’histogramme.
 
 Grafana 13.3.1 autorise la consultation locale anonyme avec le rôle Viewer. L’administration est protégée par un mot de passe aléatoire conservé dans le Secret `grafana-admin`. Les graphiques et la source Prometheus sont provisionnés depuis [le dashboard JSON](../infra/monitoring/clair-dashboard.json) et [les manifestes](../infra/monitoring/observability.yaml). Headlamp conserve les commandes de scaling Kubernetes.
 
@@ -255,4 +285,4 @@ kubectl --context docker-desktop logs -n kube-system deployment/metrics-server -
 
 ## Travaux finaux restants
 
-Sharding et réplication à l'école, basculement, cache répliqué, rafraîchissement de la base Test, déploiement Test distant automatisé et validation avant Production, mesure continue du rollout et finalisation de la documentation en ligne. Les sauvegardes, la réplication et le sharding locaux disposent de procédures de vérification.
+Sharding, réplication et cache à l'école, basculement, rafraîchissement de la base Test, déploiement Test distant automatisé et validation avant Production, mesure continue du rollout et finalisation de la documentation en ligne. Les sauvegardes, la réplication, le sharding et le cache locaux disposent de procédures de vérification.

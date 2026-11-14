@@ -35,6 +35,13 @@ spec:
             name: photo-auth
             optional: true
         env:
+        - name: REDIS_HOST
+          value: photo-cache
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: photo-cache
+              key: password
         - name: PGHOST
           value: photo-db
         - name: PGDATABASE

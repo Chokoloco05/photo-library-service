@@ -15,10 +15,27 @@ function routeLabel(path) {
   return assets.has(path) ? 'static' : 'unmatched';
 }
 
-function createMetrics(identity, database) {
+function createMetrics(identity, database, cache) {
   const registry = new Registry();
   registry.setDefaultLabels({ environment: identity.environment, pod: identity.pod });
   collectDefaultMetrics({ register: registry, prefix: 'photo_' });
+  if (cache) {
+    const exported = { hit: 0, miss: 0, error: 0, bypass: 0 };
+    new Counter({
+      name: 'photo_cache_events_total', help: 'Cache hits, misses, errors and bypass events.',
+      labelNames: ['outcome'], registers: [registry],
+      collect() {
+        for (const outcome of Object.keys(exported)) {
+          this.inc({ outcome }, cache.stats[outcome] - exported[outcome]);
+          exported[outcome] = cache.stats[outcome];
+        }
+      },
+    });
+    new Gauge({
+      name: 'photo_cache_up', help: 'Whether the application cache connection is ready.', registers: [registry],
+      collect() { this.set(cache.isReady() ? 1 : 0); },
+    });
+  }
   const requests = new Counter({
     name: 'photo_http_requests_total',
     help: 'Completed HTTP requests, with 499 for a connection closed before completion.',

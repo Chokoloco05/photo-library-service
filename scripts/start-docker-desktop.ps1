@@ -16,10 +16,11 @@ try {
     Invoke-Checked docker @('--context', 'desktop-linux', 'info', '--format', '{{.OSType}}')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'get', 'nodes', '--request-timeout=15s')
     if (-not $SkipBuild) {
-        Invoke-Checked docker @('--context', 'desktop-linux', 'build', '-t', 'photo-service:v2.3.0', '.')
+        Invoke-Checked docker @('--context', 'desktop-linux', 'build', '-t', 'photo-service:v2.4.0', '.')
     }
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'k8s/00-namespace.yaml')
     & .\scripts\database.ps1 -Namespace dev
+    & .\scripts\cache.ps1 -Namespace dev -Action Install
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'infra/docker-desktop/traefik.yaml')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'k8s/01-deployment.yaml')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'k8s/02-service.yaml')

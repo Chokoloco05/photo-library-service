@@ -76,7 +76,9 @@ test('hash sharding preserves legacy photos, cross-shard operations, migrations 
     try { await assert.rejects(database.ready()); }
     finally { await worker.query('ALTER TABLE photos_unavailable RENAME TO photos'); }
     for (const id of ids) {
+      const revision = await database.revision();
       assert.equal((await database.update(id, 'updated', 'across shards')).description, 'across shards');
+      assert.notEqual(await database.revision(), revision);
       assert.equal(await database.delete(id), true);
       assert.equal(await database.image(id, false), undefined);
     }

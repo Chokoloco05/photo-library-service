@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Install', 'Check', 'Load')][string]$Action = 'Check',
-    [ValidatePattern('^photo-service:[a-zA-Z0-9_.-]+$')][string]$Image = 'photo-service:v2.3.0',
+    [ValidatePattern('^photo-service:[a-zA-Z0-9_.-]+$')][string]$Image = 'photo-service:v2.4.0',
     [switch]$SkipBuild,
     [ValidateRange(1, 3600)][int]$DurationSeconds = 60,
     [ValidateRange(1, 100)][int]$RequestsPerSecond = 6
@@ -54,6 +54,7 @@ try {
         Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'infra/docker-desktop/traefik.yaml')
         foreach ($namespace in @('dev', 'test')) {
             & .\scripts\database.ps1 -Namespace $namespace
+            & .\scripts\cache.ps1 -Namespace $namespace -Action Install
             $folder = if ($namespace -eq 'dev') { 'k8s' } else { 'k8s/test' }
             Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', "$folder/02-service.yaml", '-f', "$folder/03-ingress.yaml")
             $rawManifest = & kubectl --context docker-desktop create --dry-run=client --validate=false -f "$folder/01-deployment.yaml" -o json

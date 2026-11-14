@@ -1,9 +1,11 @@
 const { createApp } = require('./app');
 const { createDatabase } = require('./database');
 const { createMetricsServer } = require('./metrics');
+const { createCache } = require('./cache');
 
 const database = createDatabase();
-const app = createApp({ database });
+const cache = createCache();
+const app = createApp({ database, cache });
 const port = Number(process.env.PORT || 3000);
 let server;
 let metricsServer;
@@ -21,6 +23,7 @@ async function start() {
 start().catch(async error => {
   console.error(JSON.stringify({ event: 'startup_failed', code: error.code || 'unknown' }));
   if (metricsServer) metricsServer.close();
+  cache.close();
   await database.close(); process.exitCode = 1;
 });
 
@@ -29,5 +32,6 @@ process.on('SIGTERM', async () => {
   await Promise.all([server, metricsServer].filter(Boolean).map(listener =>
     new Promise(resolve => listener.close(resolve))));
   await database.close();
+  cache.close();
   process.exit(0);
 });

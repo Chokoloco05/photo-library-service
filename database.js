@@ -36,6 +36,7 @@ function createDatabase(config = {}) {
   pool.on('error', () => console.error('Idle database connection failed.'));
   return {
     pool,
+    revision: async () => (await pool.query('SELECT token FROM library_revision WHERE singleton')).rows[0].token,
     migrate: async () => {
       const layoutExists = (await pool.query("SELECT to_regclass('photo_sharding') IS NOT NULL AS present")).rows[0].present;
       if (layoutExists) {

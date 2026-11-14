@@ -22,6 +22,7 @@ try {
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'rollout', 'status', 'deployment/traefik', '-n', 'photo-ingress', '--timeout=60s')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'k8s/test/00-namespace.yaml')
     & .\scripts\database.ps1 -Namespace test
+    & .\scripts\cache.ps1 -Namespace test -Action Install
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'k8s/test/02-service.yaml')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'k8s/test/03-ingress.yaml')
 

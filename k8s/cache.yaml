@@ -1,0 +1,116 @@
+# Namespace is supplied by scripts/cache.ps1.
+apiVersion: v1
+kind: Service
+metadata:
+  name: photo-cache
+spec:
+  selector:
+    statefulset.kubernetes.io/pod-name: photo-cache-0
+  ports:
+    - name: redis
+      port: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: photo-cache-nodes
+spec:
+  clusterIP: None
+  selector:
+    app: photo-cache
+  ports:
+    - name: redis
+      port: 6379
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: photo-cache
+spec:
+  serviceName: photo-cache-nodes
+  replicas: 2
+  selector:
+    matchLabels:
+      app: photo-cache
+  template:
+    metadata:
+      labels:
+        app: photo-cache
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          image: redis:8.10.3-alpine
+          command:
+            - sh
+            - -ec
+            - |
+              umask 077
+              printf 'bind 0.0.0.0\nprotected-mode yes\nport 6379\ndir /data\nappendonly yes\nappendfsync everysec\nsave ""\nmaxmemory 64mb\nmaxmemory-policy allkeys-lru\nrequirepass %s\nmasterauth %s\n' "$REDISCLI_AUTH" "$REDISCLI_AUTH" > /tmp/redis.conf
+              if [ "$HOSTNAME" != photo-cache-0 ]; then
+                printf 'replicaof photo-cache 6379\nreplica-read-only yes\n' >> /tmp/redis.conf
+              fi
+              exec redis-server /tmp/redis.conf
+          env:
+            - name: REDISCLI_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: photo-cache
+                  key: password
+          ports:
+            - name: redis
+              containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          startupProbe:
+            exec:
+              command: [redis-cli, ping]
+            timeoutSeconds: 5
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -ec
+                - |
+                  test "$(redis-cli --raw ping)" = PONG
+                  if [ "$HOSTNAME" != photo-cache-0 ]; then
+                    redis-cli --raw INFO replication | grep -q '^master_link_status:up'
+                  fi
+            timeoutSeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: [redis-cli, ping]
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi

@@ -11,7 +11,8 @@ function createApp(options = {}) {
   const identity = createIdentity(options);
   app.locals.identity = identity;
   const database = options.database;
-  app.locals.metrics = createMetrics(identity, database);
+  const cache = options.cache;
+  app.locals.metrics = createMetrics(identity, database, cache);
   app.use(app.locals.metrics.middleware);
   const basePath = (options.basePath ?? (options.env || process.env).APP_BASE_PATH ?? '').replace(/\/$/, '');
   if (basePath && !/^\/[a-zA-Z0-9/_-]+$/.test(basePath)) throw new Error('Invalid APP_BASE_PATH');
@@ -74,10 +75,11 @@ function createApp(options = {}) {
     if (photos.length > 2000) throw Object.assign(new Error('Cette version prend en charge 2 000 photos maximum. Réduis la bibliothèque avant une nouvelle analyse.'), { status: 409 });
     return photos;
   };
-  app.get('/api/photos', async (_req, res) => res.json({ photos: await list() }));
-  app.get('/api/stats', async (_req, res) => res.json(await database.stats()));
-  app.get('/api/duplicates', async (_req, res) => res.json({ groups: duplicates(await list()) }));
-  app.get('/api/similar', async (_req, res) => res.json({ pairs: similar(await list()) }));
+  const read = (key, load) => cache ? cache.read(key, () => database.revision(), load) : load();
+  app.get('/api/photos', async (_req, res) => res.json(await read('photos', async () => ({ photos: await list() }))));
+  app.get('/api/stats', async (_req, res) => res.json(await read('stats', () => database.stats())));
+  app.get('/api/duplicates', async (_req, res) => res.json(await read('duplicates', async () => ({ groups: duplicates(await list()) }))));
+  app.get('/api/similar', async (_req, res) => res.json(await read('similar', async () => ({ pairs: similar(await list()) }))));
   app.post('/api/photos', (req, res, next) => {
     if (uploads >= 2) return res.status(429).json({ error: 'Deux imports sont en cours. Réessaie dans quelques secondes.' });
     uploads++;

@@ -43,7 +43,7 @@ Grafana et Prometheus sont installés localement. Le [guide de supervision](docs
 
 ## Structure du dépôt
 
-La version locale 2.3.0 répartit les photos entre deux shards PostgreSQL par environnement, chacun avec son réplica persistant. Les [procédures de sharding](docs/infrastructure.md#sharding-postgresql-local), de [réplication](docs/infrastructure.md#réplication-postgresql-locale) et de [sauvegarde](docs/application.md#sauvegarde-et-restauration-locale) décrivent leur installation et leurs contrôles. Cette évolution est préparée dans le dossier de travail.
+La version locale 2.4.0 répartit les photos entre deux shards PostgreSQL par environnement, chacun avec son réplica persistant, et ajoute un cache Redis répliqué. Les procédures de [cache](docs/infrastructure.md#cache-redis-répliqué-local), de [sharding](docs/infrastructure.md#sharding-postgresql-local), de [réplication](docs/infrastructure.md#réplication-postgresql-locale) et de [sauvegarde](docs/application.md#sauvegarde-et-restauration-locale) décrivent leur installation et leurs contrôles. Cette évolution est préparée dans le dossier de travail.
 
 | Emplacement | Rôle |
 | --- | --- |

@@ -34,6 +34,11 @@ DO $$ BEGIN
             RAISE EXCEPTION 'Sharding copy differs from the original library';
         END IF;
     END IF;
+    IF to_regclass('public.library_revision') IS NOT NULL
+        AND NOT EXISTS (SELECT FROM pg_trigger WHERE tgrelid='public.photos'::regclass AND tgname='library_revision_changed') THEN
+        CREATE TRIGGER library_revision_changed AFTER INSERT OR UPDATE OR DELETE OR TRUNCATE ON public.photos
+            FOR EACH STATEMENT EXECUTE FUNCTION public.bump_library_revision();
+    END IF;
 END $$;
 
 CREATE TABLE IF NOT EXISTS public.photo_sharding (
