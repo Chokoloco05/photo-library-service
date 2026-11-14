@@ -46,7 +46,7 @@ try {
         $digest = $pod.status.containerStatuses[0].imageID -replace '^.*@', '' -replace '^[a-z-]+://', ''
         if (-not $pod.status.containerStatuses[0].ready -or $digest -ne $release.runtimeDigest) { throw 'Test Pods do not match the validated image.' }
     }
-    $rawInfo = & curl.exe --noproxy '*' --fail --silent --show-error --max-time 5 http://test.localhost/api/info
+    $rawInfo = & curl.exe --noproxy '*' --fail --silent --show-error --retry 3 --retry-all-errors --retry-delay 1 --max-time 5 -H 'Host: test.localhost' http://127.0.0.1/api/info
     if ($LASTEXITCODE -ne 0 -or (($rawInfo -join "`n" | ConvertFrom-Json).revision -ne $release.revision)) { throw 'Test HTTP identity differs from the validated release.' }
 
     Invoke-Kube 'prod' @('apply', '-f', 'k8s/00-namespace.yaml')
@@ -100,7 +100,7 @@ try {
     }
     if ($pods.Count -ne 3) { throw 'Production must have three ready replicas.' }
     for ($attempt = 0; $attempt -lt 15; $attempt++) {
-        $rawInfo = & curl.exe --noproxy '*' --fail --silent --show-error --max-time 5 http://prod.localhost/api/info
+        $rawInfo = & curl.exe --noproxy '*' --fail --silent --show-error --max-time 5 -H 'Host: prod.localhost' http://127.0.0.1/api/info
         if ($LASTEXITCODE -eq 0) {
             $info = ($rawInfo -join "`n") | ConvertFrom-Json
             if ($info.environment -eq 'prod' -and $info.revision -eq $release.revision) { break }
@@ -109,7 +109,7 @@ try {
     }
     if ($info.environment -ne 'prod' -or $info.revision -ne $release.revision) { throw 'Production HTTP identity did not converge.' }
     foreach ($endpoint in @('/api/info', '/readyz', '/api/stats')) {
-        & curl.exe --noproxy '*' --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 2 --max-time 5 "http://prod.localhost$endpoint"
+        & curl.exe --noproxy '*' --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 2 --max-time 5 -H 'Host: prod.localhost' "http://127.0.0.1$endpoint"
         if ($LASTEXITCODE -ne 0) { throw 'Production HTTP verification failed.' }
     }
     $release | Add-Member -NotePropertyName productionImage -NotePropertyValue $productionImage -Force
