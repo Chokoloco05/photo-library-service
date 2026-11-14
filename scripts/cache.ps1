@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][ValidateSet('dev', 'test')][string]$Namespace,
+    [Parameter(Mandatory = $true)][ValidateSet('dev', 'test', 'prod')][string]$Namespace,
     [ValidateSet('Install', 'Check', 'Exercise')][string]$Action = 'Check'
 )
 $ErrorActionPreference = 'Stop'

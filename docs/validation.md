@@ -298,6 +298,20 @@ Cette validation remplace les états précédents indiquant l'arrêt des applica
 Les [résultats structurés](evidence/school-auth-release-2026-11-10.json) conservent les contrôles et la version sans secret. Ce déploiement depuis des applications arrêtées ne constitue pas une démonstration mesurée de zéro interruption.
 
 
+## Promotion Test vers Production locale — 14 novembre 2026
+
+- Production locale est accessible sur `http://prod.localhost/` avec trois Pods applicatifs, deux shards PostgreSQL répliqués, Redis répliqué et le compte administrateur commun.
+- Le workflow Test prépare un artefact `validated-test` qui identifie le commit et l'image validée. Le nouveau workflow `promote-production.yml` permet une validation humaine par lancement manuel avec le numéro du run Test réussi.
+- Les deux workflows ont passé actionlint 1.7.12 avec le label réel `photo-local`. Les vérifications GitHub rejettent les runs échoués, les pull requests, les autres dépôts et les branches autres que `main`.
+- Le parcours local a enregistré la révision `local-20261114034025` en Test puis l'a promue en Production. L'identifiant de l'image exécutée est identique dans les deux environnements.
+- Pendant le RollingUpdate Production, 392 requêtes sur `/api/info` et `/api/stats` ont terminé sans erreur pendant 49,787 secondes. La latence maximale mesurée était de 132 ms. Les deux révisions observées sont le commit `0852ccbf652fc47e66e6f40453c9a0af9048d53d` et la nouvelle révision locale.
+- Les sauvegardes Production ont été restaurées et vérifiées avant la promotion. Les quatre migrations SQL sont appliquées sur ses deux shards. Les bibliothèques Test et Production restent indépendantes et vides.
+- Trente-six tests ont réussi avec PostgreSQL et Redis temporaires, aucun ignoré. Les trois nouveaux tests vérifient la mesure du rollout, le rejet d'une interruption HTTP et la conservation des preuves lors d'un échec Kubernetes.
+- Le script de promotion a également refusé une fiche associée à un numéro de run inattendu, avant modification de Production.
+- Prometheus collecte neuf instances applicatives. Les quatre Pods PostgreSQL Production réservent chacun 64 Mio sur le cluster local de 4 Gio, avec une limite de 256 Mio par Pod.
+
+Les [preuves structurées](evidence/production-promotion-2026-11-14.json) conservent les identifiants et la mesure HTTP. La nouvelle orchestration GitHub reste à publier et à exécuter après le prochain push. La première installation Production a comporté une initialisation du sharding distincte de la mise à jour mesurée. Le scénario de démonstration avec une nouvelle migration SQL reste à préparer.
+
 ## Cache Redis répliqué local — 14 novembre 2026
 
 - Redis 8.10.3 est installé dans Dev et Test, avec un primaire authentifié et un réplica en lecture seule par environnement. Chaque instance possède son PVC de 1 Gio.

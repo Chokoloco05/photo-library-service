@@ -37,13 +37,14 @@ Avec Docker Desktop et Kubernetes démarrés, suivre le [lancement](docs/applica
 
 - Dev : http://localhost/
 - Test : http://test.localhost/
+- Production locale — http://prod.localhost/
 - Headlamp : http://dashboard.localhost/ — [connexion et scaling](docs/infrastructure.md#monitoring-et-milestone-3).
 
 Grafana et Prometheus sont installés localement. Le [guide de supervision](docs/infrastructure.md#prometheus-et-grafana) décrit les graphiques, la collecte et le trafic de démonstration. Ouvrir [le dashboard Clair](http://grafana.localhost/d/clair/clair).
 
 ## Structure du dépôt
 
-La version locale 2.4.0 répartit les photos entre deux shards PostgreSQL par environnement, chacun avec son réplica persistant, et ajoute un cache Redis répliqué. Les procédures de [cache](docs/infrastructure.md#cache-redis-répliqué-local), de [sharding](docs/infrastructure.md#sharding-postgresql-local), de [réplication](docs/infrastructure.md#réplication-postgresql-locale) et de [sauvegarde](docs/application.md#sauvegarde-et-restauration-locale) décrivent leur installation et leurs contrôles. Cette évolution est préparée dans le dossier de travail.
+La version locale 2.4.0 utilise deux shards PostgreSQL par environnement, chacun avec son réplica persistant, et un cache Redis répliqué. Dev, Test et Production locale sont installés. La [promotion Production](docs/infrastructure.md#validation-et-promotion-production-locale) réutilise l'image validée en Test après validation humaine et mesure le rollout. Cette évolution du pipeline est préparée dans le dossier de travail. Les procédures de [cache](docs/infrastructure.md#cache-redis-répliqué-local), de [sharding](docs/infrastructure.md#sharding-postgresql-local), de [réplication](docs/infrastructure.md#réplication-postgresql-locale) et de [sauvegarde](docs/application.md#sauvegarde-et-restauration-locale) décrivent les contrôles associés.
 
 | Emplacement | Rôle |
 | --- | --- |

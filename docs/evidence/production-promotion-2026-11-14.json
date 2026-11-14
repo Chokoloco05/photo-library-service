@@ -1,0 +1,41 @@
+{
+  "scope": "docker-desktop",
+  "githubPromotionWorkflowExecuted": false,
+  "testRelease": {
+    "schemaVersion": 1,
+    "image": "photo-service:promotion-20261114034025",
+    "imageId": "sha256:64ad62fdbdc52f0d27ef48ab9177fab4d40912b40afdd6100bf25ce70600bbb0",
+    "runtimeDigest": "sha256:64ad62fdbdc52f0d27ef48ab9177fab4d40912b40afdd6100bf25ce70600bbb0",
+    "revision": "local-20261114034025",
+    "version": "v2.4.0",
+    "testRunId": "local",
+    "runAttempt": 0,
+    "verifiedAtUtc": "2026-11-14T03:44:47.1525206Z"
+  },
+  "promotedRelease": {
+    "schemaVersion": 1,
+    "image": "photo-service:promotion-20261114034025",
+    "imageId": "sha256:64ad62fdbdc52f0d27ef48ab9177fab4d40912b40afdd6100bf25ce70600bbb0",
+    "runtimeDigest": "sha256:64ad62fdbdc52f0d27ef48ab9177fab4d40912b40afdd6100bf25ce70600bbb0",
+    "revision": "local-20261114034025",
+    "version": "v2.4.0",
+    "testRunId": "local",
+    "runAttempt": 0,
+    "verifiedAtUtc": "2026-11-14T03:44:47.1525206Z",
+    "productionImage": "photo-service:release-64ad62fdbdc52f0d27ef48ab9177fab4d40912b40afdd6100bf25ce70600bbb0"
+  },
+  "rollout": {
+    "startedAtUtc": "2026-11-14T03:45:38.121Z",
+    "expectedRevision": "local-20261114034025",
+    "requests": 392,
+    "errors": 0,
+    "maxLatencyMs": 132,
+    "observedRevisions": [
+      "0852ccbf652fc47e66e6f40453c9a0af9048d53d",
+      "local-20261114034025"
+    ],
+    "failures": [],
+    "durationSeconds": 49.787,
+    "passed": true
+  }
+}

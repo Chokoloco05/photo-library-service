@@ -11,51 +11,38 @@ Démarrer Docker Desktop et attendre que Kubernetes soit prêt, puis :
 ```powershell
 # 1. Vérifier le cluster
 kubectl --context docker-desktop get nodes
+$environments = @('dev', 'test', 'prod')
 
-# 2. Relancer les bases et attendre leur disponibilité
-kubectl --context docker-desktop -n dev scale statefulset/photo-db --replicas=1
-kubectl --context docker-desktop -n test scale statefulset/photo-db --replicas=1
-kubectl --context docker-desktop -n dev scale statefulset/photo-db-shard-1 --replicas=1
-kubectl --context docker-desktop -n test scale statefulset/photo-db-shard-1 --replicas=1
-kubectl --context docker-desktop -n dev rollout status statefulset/photo-db --timeout=240s
-kubectl --context docker-desktop -n test rollout status statefulset/photo-db --timeout=240s
-kubectl --context docker-desktop -n dev rollout status statefulset/photo-db-shard-1 --timeout=240s
-kubectl --context docker-desktop -n test rollout status statefulset/photo-db-shard-1 --timeout=240s
-kubectl --context docker-desktop -n dev scale statefulset/photo-db-replica --replicas=1
-kubectl --context docker-desktop -n test scale statefulset/photo-db-replica --replicas=1
-kubectl --context docker-desktop -n dev scale statefulset/photo-db-shard-1-replica --replicas=1
-kubectl --context docker-desktop -n test scale statefulset/photo-db-shard-1-replica --replicas=1
-kubectl --context docker-desktop -n dev rollout status statefulset/photo-db-replica --timeout=240s
-kubectl --context docker-desktop -n test rollout status statefulset/photo-db-replica --timeout=240s
-kubectl --context docker-desktop -n dev rollout status statefulset/photo-db-shard-1-replica --timeout=240s
-kubectl --context docker-desktop -n test rollout status statefulset/photo-db-shard-1-replica --timeout=240s
-kubectl --context docker-desktop -n dev scale statefulset/photo-cache --replicas=2
-kubectl --context docker-desktop -n test scale statefulset/photo-cache --replicas=2
-kubectl --context docker-desktop -n dev rollout status statefulset/photo-cache --timeout=240s
-kubectl --context docker-desktop -n test rollout status statefulset/photo-cache --timeout=240s
+# 2. Relancer les bases, leurs réplicas et les caches déjà installés
+foreach ($environment in $environments) {
+    foreach ($database in @('photo-db', 'photo-db-shard-1', 'photo-db-replica', 'photo-db-shard-1-replica')) {
+        kubectl --context docker-desktop -n $environment scale "statefulset/$database" --replicas=1
+        kubectl --context docker-desktop -n $environment rollout status "statefulset/$database" --timeout=240s
+    }
+    kubectl --context docker-desktop -n $environment scale statefulset/photo-cache --replicas=2
+    kubectl --context docker-desktop -n $environment rollout status statefulset/photo-cache --timeout=240s
+}
 
 # 3. Relancer le contrôleur Ingress
 kubectl --context docker-desktop -n photo-ingress scale deployment/traefik --replicas=1
 kubectl --context docker-desktop -n photo-ingress rollout status deployment/traefik --timeout=180s
 
-# 4. Relancer les applications
-kubectl --context docker-desktop -n dev scale deployment/photo-service --replicas=3
-kubectl --context docker-desktop -n test scale deployment/photo-service --replicas=3
-kubectl --context docker-desktop -n dev rollout status deployment/photo-service --timeout=240s
-kubectl --context docker-desktop -n test rollout status deployment/photo-service --timeout=240s
+# 4. Relancer les trois applications
+foreach ($environment in $environments) {
+    kubectl --context docker-desktop -n $environment scale deployment/photo-service --replicas=3
+    kubectl --context docker-desktop -n $environment rollout status deployment/photo-service --timeout=240s
+}
 
-# 5. Relancer les métriques et le dashboard
+# 5. Relancer les outils de supervision
 kubectl --context docker-desktop -n kube-system scale deployment/metrics-server --replicas=1
 kubectl --context docker-desktop -n monitoring scale deployment/headlamp --replicas=1
+kubectl --context docker-desktop -n monitoring scale statefulset/prometheus statefulset/grafana --replicas=1
 kubectl --context docker-desktop -n kube-system rollout status deployment/metrics-server --timeout=180s
 kubectl --context docker-desktop -n monitoring rollout status deployment/headlamp --timeout=180s
-
-# 6. Relancer Prometheus et Grafana après leur première installation
-kubectl --context docker-desktop -n monitoring scale statefulset/prometheus statefulset/grafana --replicas=1
 kubectl --context docker-desktop -n monitoring rollout status statefulset/prometheus --timeout=300s
 kubectl --context docker-desktop -n monitoring rollout status statefulset/grafana --timeout=300s
 
-# 7. Relancer le runner pour les prochains pipelines GitHub
+# 6. Relancer le runner GitHub
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Start
 ```
 
@@ -63,9 +50,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.
 | --- | --- |
 | Dev | http://localhost/ |
 | Test | http://test.localhost/ |
+| Production locale | http://prod.localhost/ |
 | Dashboard Headlamp | http://dashboard.localhost/ |
 | Graphiques Grafana | http://grafana.localhost/d/clair/clair |
 | Collecte Prometheus | http://prometheus.localhost/targets |
+
+Pour une première création de Production locale, suivre la [promotion depuis Test](infrastructure.md#validation-et-promotion-production-locale).
 
 Pour la première installation des graphiques, suivre le [guide Prometheus et Grafana](infrastructure.md#prometheus-et-grafana).
 
@@ -82,32 +72,27 @@ Ce jeton sert au dashboard Kubernetes, pas à la connexion admin de Clair. Ne pa
 Attendre la fin des jobs GitHub. Si le script refuse l'arrêt du runner parce qu'un job est actif, attendre sa fin avant de poursuivre.
 
 ```powershell
-# 1. Arrêter le runner
+# 1. Arrêter le runner après la fin des jobs
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\github-runner.ps1 -Action Stop
+$environments = @('dev', 'test', 'prod')
 
-# 2. Arrêter les applications avant leurs bases
-kubectl --context docker-desktop -n dev scale deployment/photo-service --replicas=0
-kubectl --context docker-desktop -n test scale deployment/photo-service --replicas=0
-kubectl --context docker-desktop -n dev wait --for=delete pod -l app=photo-service --timeout=180s
-kubectl --context docker-desktop -n test wait --for=delete pod -l app=photo-service --timeout=180s
+# 2. Arrêter les applications
+foreach ($environment in $environments) {
+    kubectl --context docker-desktop -n $environment scale deployment/photo-service --replicas=0
+    kubectl --context docker-desktop -n $environment wait --for=delete pod -l app=photo-service --timeout=180s
+}
 
-# 3. Arrêter les réplicas puis les bases primaires
-kubectl --context docker-desktop -n dev scale statefulset/photo-cache --replicas=0
-kubectl --context docker-desktop -n test scale statefulset/photo-cache --replicas=0
-kubectl --context docker-desktop -n dev scale statefulset/photo-db-replica --replicas=0
-kubectl --context docker-desktop -n test scale statefulset/photo-db-replica --replicas=0
-kubectl --context docker-desktop -n dev scale statefulset/photo-db-shard-1-replica --replicas=0
-kubectl --context docker-desktop -n test scale statefulset/photo-db-shard-1-replica --replicas=0
-kubectl --context docker-desktop -n dev wait --for=delete pod -l app=photo-db-replica --timeout=180s
-kubectl --context docker-desktop -n test wait --for=delete pod -l app=photo-db-replica --timeout=180s
-kubectl --context docker-desktop -n dev wait --for=delete pod -l app=photo-db-shard-1-replica --timeout=180s
-kubectl --context docker-desktop -n test wait --for=delete pod -l app=photo-db-shard-1-replica --timeout=180s
-kubectl --context docker-desktop -n dev scale statefulset/photo-db --replicas=0
-kubectl --context docker-desktop -n test scale statefulset/photo-db --replicas=0
-kubectl --context docker-desktop -n dev scale statefulset/photo-db-shard-1 --replicas=0
-kubectl --context docker-desktop -n test scale statefulset/photo-db-shard-1 --replicas=0
+# 3. Arrêter les caches, les réplicas et les primaires
+foreach ($environment in $environments) {
+    kubectl --context docker-desktop -n $environment scale statefulset/photo-cache --replicas=0
+    foreach ($replica in @('photo-db-replica', 'photo-db-shard-1-replica')) {
+        kubectl --context docker-desktop -n $environment scale "statefulset/$replica" --replicas=0
+        kubectl --context docker-desktop -n $environment wait --for=delete pod -l "app=$replica" --timeout=180s
+    }
+    kubectl --context docker-desktop -n $environment scale statefulset/photo-db statefulset/photo-db-shard-1 --replicas=0
+}
 
-# 4. Arrêter les dashboards, les métriques et Traefik
+# 4. Arrêter la supervision et Traefik
 kubectl --context docker-desktop -n monitoring scale statefulset/prometheus statefulset/grafana --replicas=0
 kubectl --context docker-desktop -n monitoring scale deployment/headlamp --replicas=0
 kubectl --context docker-desktop -n kube-system scale deployment/metrics-server --replicas=0

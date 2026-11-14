@@ -91,9 +91,10 @@ try {
     $health = Read-Endpoint 'http://grafana.localhost/api/health'
     if ($health.database -ne 'ok') { throw 'Grafana database is unavailable.' }
     $expectedTargets = 0
-    foreach ($namespace in @('dev', 'test')) {
-        $raw = & kubectl --context docker-desktop -n $namespace get deployment/photo-service -o json
+    foreach ($namespace in @('dev', 'test', 'prod')) {
+        $raw = & kubectl --context docker-desktop -n $namespace get deployment/photo-service --ignore-not-found -o json
         if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect the application replicas.' }
+        if (-not $raw) { continue }
         $deployment = ($raw -join "`n") | ConvertFrom-Json
         $expectedTargets += $deployment.spec.replicas
     }

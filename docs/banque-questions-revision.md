@@ -18,7 +18,7 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **1. Question : ★ Présente le projet en une minute : son objectif, ce qui fonctionne déjà et ce qui reste à développer.**
 
-**Réponse :** J’ai réalisé une photothèque appelée Clair, déployée avec trois répliques dans Kubernetes. Le premier milestone apporte les répliques applicatives et l’Ingress. Le deuxième automatise les tests, le build et le rollout dans Test. Le troisième utilise Headlamp pour surveiller et dimensionner les services. Grafana et Prometheus complètent la supervision. La version locale conserve les photos dans deux shards PostgreSQL par environnement, chacun répliqué, et utilise un cache Redis répliqué. La promotion automatisée vers Production reste à réaliser.
+**Réponse :** J’ai réalisé une photothèque appelée Clair, déployée avec trois répliques dans Kubernetes. Le premier milestone apporte les répliques applicatives et l’Ingress. Le deuxième automatise les tests, le build et le rollout dans Test. Le troisième utilise Headlamp pour surveiller et dimensionner les services. Grafana et Prometheus complètent la supervision. La version locale conserve les photos dans deux shards PostgreSQL par environnement, chacun répliqué, et utilise un cache Redis répliqué. La promotion locale après validation humaine est préparée et vérifiée avec une mesure continue du rollout. Son déclenchement GitHub reste à publier et à vérifier.
 
 **2. Question : ★ Décris le parcours d'une requête depuis le navigateur jusqu'au code Express.**
 
@@ -216,7 +216,7 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **48. Question : ★ Que faudrait-il ajouter avant un usage en production ? Classe tes propositions par besoin concret.**
 
-**Réponse :** Le stockage persistant, le compte administrateur, la supervision, les sauvegardes testées, le sharding, la réplication PostgreSQL et le cache répliqué locaux sont présents. Il reste notamment TLS à l'école, résilience sur plusieurs nœuds, basculement automatique, rafraîchissement Test et promotion automatisée vers Production. Les trois applications école sont déployées dans `team5`, avec une architecture de données encore à faire évoluer.
+**Réponse :** Le stockage persistant, le compte administrateur, la supervision, les sauvegardes testées, le sharding, la réplication PostgreSQL et le cache répliqué locaux sont présents. Il reste notamment TLS à l'école, résilience sur plusieurs nœuds, basculement automatique, rafraîchissement Test et transfert du pipeline complet vers l'école. Les trois applications école sont déployées dans `team5`, avec une architecture de données encore à faire évoluer.
 
 ## Milestone 1 — Justifier et démontrer mes choix
 
@@ -387,7 +387,7 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **88. Question : ★ Qu’est-ce que je ne dois pas annoncer comme terminé ?**
 
-**Réponse :** Les trois milestones disposent de réalisations et de preuves locales. La réplication PostgreSQL, le sharding et le cache répliqué sont vérifiés sur Docker Desktop. Le rafraîchissement Test depuis Production, la promotion automatisée vers Production et la mesure complète sans interruption restent à réaliser. Le pipeline Test cible encore le cluster local. Le transfert de l'architecture de données et du monitoring vers l'école reste à préparer avec les permissions disponibles.
+**Réponse :** Les trois milestones disposent de réalisations et de preuves locales. La réplication PostgreSQL, le sharding et le cache répliqué sont vérifiés sur Docker Desktop. Le rafraîchissement Test depuis Production et la démonstration finale avec une nouvelle migration restent à préparer. Le pipeline local de promotion après validation humaine est vérifié avec une mesure du rollout. Sa publication GitHub reste à effectuer. Le transfert de l'architecture de données et du monitoring vers l'école reste à préparer avec les permissions disponibles.
 
 ## Trois présentations prêtes pour l’oral
 

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][ValidateSet('dev', 'test')][string]$Namespace,
+    [Parameter(Mandatory = $true)][ValidateSet('dev', 'test', 'prod')][string]$Namespace,
     [ValidateSet('Install', 'Check')][string]$Action = 'Install',
     [ValidateSet('photo-db', 'photo-db-shard-1')][string]$DatabaseName = 'photo-db'
 )
@@ -16,9 +16,12 @@ function Invoke-DatabaseQuery {
 }
 function Apply-DatabaseManifest {
     param([string]$File)
-    $raw = & kubectl --context docker-desktop -n $Namespace create --dry-run=client --validate=false -f $File -o json
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot render database resources.' }
-    ($raw -join "`n").Replace('photo-db', $DatabaseName) | & kubectl --context docker-desktop -n $Namespace apply -f -
+    $manifest = (Get-Content -LiteralPath $File -Raw).Replace('photo-db', $DatabaseName)
+    if ($Namespace -eq 'prod') {
+        # Leave capacity for all three environments on this 4 GiB local cluster.
+        $manifest = $manifest.Replace('memory: 128Mi', 'memory: 64Mi')
+    }
+    $manifest | & kubectl --context docker-desktop -n $Namespace apply -f -
     if ($LASTEXITCODE -ne 0) { throw 'Cannot apply database resources.' }
 }
 Push-Location (Split-Path $PSScriptRoot -Parent)

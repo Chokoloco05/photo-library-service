@@ -34,7 +34,7 @@ try {
     if ($hash -notmatch '^scrypt\$65536\$8\$2\$[a-f0-9]{32}\$[a-f0-9]{128}$') { throw 'Hachage administrateur invalide.' }
     $targets = @()
     if ($Target -in @('All', 'Local')) {
-        foreach ($environment in @('dev', 'test')) {
+        foreach ($environment in @('dev', 'test', 'prod')) {
             $targets += @{Namespace=$environment;Access=@('--context','docker-desktop');Deployments=@('photo-service');School=$false}
         }
     }
@@ -54,6 +54,9 @@ try {
         ($secret | ConvertTo-Json -Depth 6) | & kubectl @access apply --server-side --field-manager=photo-auth -f -
         if ($LASTEXITCODE -ne 0) { throw "Configuration interrompue pour $($destination.Namespace). Les destinations précédentes peuvent déjà être mises à jour." }
         foreach ($deployment in $destination.Deployments) {
+            $existing = & kubectl @access -n $destination.Namespace get deployment $deployment --ignore-not-found -o name
+            if ($LASTEXITCODE -ne 0) { throw 'Impossible de vérifier le déploiement à redémarrer.' }
+            if (-not $existing) { continue }
             & kubectl @access -n $destination.Namespace rollout restart "deployment/$deployment"
             if ($LASTEXITCODE -ne 0) { throw "Compte configuré, mais redémarrage impossible : $deployment" }
         }

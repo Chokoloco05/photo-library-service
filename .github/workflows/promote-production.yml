@@ -1,0 +1,80 @@
+name: Promote validated Test to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_run_id:
+        description: Successful Test pipeline run ID reviewed for promotion
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: photo-release-${{ github.repository }}-main
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Windows, X64, photo-local]
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: http://prod.localhost/
+    env:
+      PROMOTION_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Verify the selected successful main-branch workflow
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_RUN_ID: ${{ inputs.test_run_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:SOURCE_RUN_ID -notmatch '^[0-9]+$') { throw 'Expected a numeric Test run ID.' }
+          $headers = @{Authorization="Bearer $env:GH_TOKEN";Accept='application/vnd.github+json'}
+          $run = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:REPOSITORY/actions/runs/$env:SOURCE_RUN_ID" -Headers $headers
+          if ($run.status -ne 'completed' -or $run.conclusion -ne 'success' -or $run.head_branch -ne 'main' -or
+              $run.path -ne '.github/workflows/test-pipeline.yml' -or $run.event -notin @('push','workflow_dispatch') -or
+              $run.head_repository.full_name -ne $env:REPOSITORY -or $run.head_sha -notmatch '^[a-f0-9]{40}$') {
+            throw 'Select a successful main-branch Test pipeline from this repository.'
+          }
+          "sha=$($run.head_sha)" | Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: validated-test
+          run-id: ${{ inputs.test_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/selected-release-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Promote the exact tested image and measure the rollout
+        env:
+          SOURCE_RUN_ID: ${{ inputs.test_run_id }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          & .\scripts\promote-production.ps1 -ReleaseFile "$env:RUNNER_TEMP\selected-release-$env:PROMOTION_KEY\test-release.json" -ExpectedRunId $env:SOURCE_RUN_ID -ExpectedCommit $env:SOURCE_SHA -EvidenceDirectory "$env:RUNNER_TEMP\production-evidence-$env:PROMOTION_KEY"
+          @"
+          ## Production promotion
+          - Validated Test run: $env:SOURCE_RUN_ID
+          - Commit: $env:SOURCE_SHA
+          - Environment: local Docker Desktop / prod
+          - Application: http://prod.localhost/
+          "@ | Out-File $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+      - name: Preserve production validation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-evidence-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/production-evidence-${{ github.run_id }}-${{ github.run_attempt }}/*.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -29,6 +29,21 @@ spec:
       targetPort: 9090
 ---
 apiVersion: v1
+kind: Service
+metadata:
+  name: photo-service-metrics
+  namespace: prod
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: photo-service
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: prometheus-config
@@ -46,6 +61,7 @@ data:
           - names:
               - photo-service-metrics.dev.svc.cluster.local
               - photo-service-metrics.test.svc.cluster.local
+              - photo-service-metrics.prod.svc.cluster.local
             type: A
             port: 9090
             refresh_interval: 10s

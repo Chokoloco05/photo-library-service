@@ -12,7 +12,7 @@ permissions:
 
 # Serialize pipelines for main; a new push never cancels an ongoing rollout.
 concurrency:
-  group: photo-test-${{ github.repository }}-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  group: photo-release-${{ github.repository }}-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
   cancel-in-progress: false
 
 jobs:
@@ -86,7 +86,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Image build failed.' }
       - name: Roll out and verify the deployed revision through Ingress
         run: |
-          & .\scripts\deploy-test.ps1 -Image $env:IMAGE -ExpectedRevision $env:REVISION
+          & .\scripts\deploy-test.ps1 -Image $env:IMAGE -ExpectedRevision $env:REVISION -ReleaseFile "$env:RUNNER_TEMP\photo-release\test-release.json"
+      - name: Preserve the validated release identity
+        uses: actions/upload-artifact@v7
+        with:
+          name: validated-test
+          path: ${{ runner.temp }}/photo-release/test-release.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 30
       - name: Record deployment evidence
         run: |
           @"

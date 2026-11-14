@@ -145,6 +145,7 @@ Source de vérité : [test-pipeline.yml](../.github/workflows/test-pipeline.yml)
 ```text
 PR -> installation + syntaxe + tests avec PostgreSQL temporaire
 main -> mêmes tests -> build et rollout Test local -> publication privée GHCR
+validation humaine dans GitHub -> promotion de l'image Test -> Production locale
 ```
 
 - Les pull requests ne déploient pas.
@@ -156,7 +157,44 @@ main -> mêmes tests -> build et rollout Test local -> publication privée GHCR
 - Un job GitHub hébergé publie ensuite une image GHCR privée avec `GITHUB_TOKEN` et `packages: write`. Il vérifie la visibilité et affiche le digest à déployer.
 - Les pipelines de `main` sont sérialisés, sans annuler un rollout en cours.
 
-Le pipeline reste actuellement dépendant du PC pour le déploiement Test. Le déploiement à l'école a été effectué séparément avec `deploy-school.ps1`. La promotion automatique vers Production après validation n'est pas encore implémentée.
+Le pipeline utilise le PC pour Test et Production locale. Le déploiement à l'école utilise séparément `deploy-school.ps1`. Après validation humaine, le workflow de promotion déploie l'image identifiée et validée en Test.
+
+### Validation et promotion Production locale
+
+Le workflow [promote-production.yml](../.github/workflows/promote-production.yml) utilise un déclenchement manuel `workflow_dispatch`. La personne qui valide Test lance la promotion depuis GitHub. Le workflow vérifie le succès du run sélectionné, sa branche `main`, son dépôt et son origine dans le workflow Test.
+
+1. Pousser les changements sur `main` et attendre le succès du pipeline Test.
+2. Vérifier l'application sur `http://test.localhost/` et relever le numéro du run dans son URL GitHub Actions.
+3. Dans Actions, ouvrir **Promote validated Test to Production**, puis **Run workflow** sur `main`.
+4. Renseigner ce numéro dans `test_run_id` et lancer le workflow.
+5. Consulter le résultat et les preuves `production-evidence`, puis ouvrir `http://prod.localhost/`.
+
+Le job Test conserve une fiche `test-release.json` dans l'artefact `validated-test` pendant trente jours. Elle contient le commit, le tag, l'identifiant Docker et l'identifiant observé dans les Pods. Un nouvel essai Test réussi remplace cette fiche au sein du même run. Le workflow Production télécharge la fiche du run choisi et vérifie que Test utilise encore cette image avec des Pods prêts.
+
+L'image testée reste dans le moteur Docker Desktop. La promotion crée une référence locale fondée sur son identifiant, vérifie son contenu et déploie cette référence avec `imagePullPolicy: Never`. Si l'image a été supprimée localement, relancer le pipeline Test pour produire une nouvelle version validée. La publication privée GHCR actuelle est un job séparé destiné au déploiement école.
+
+Les deux workflows partagent leur groupe de concurrence pour sérialiser les déploiements Test et Production. Un verrou local empêche également deux promotions simultanées lancées par les scripts sous le même compte Windows.
+
+Production locale utilise trois Pods applicatifs, deux shards PostgreSQL avec leurs réplicas, un cache Redis répliqué, son namespace `prod` et son entrée Traefik `prod.localhost`. Le Deployment est rendu depuis le modèle Test avec l'environnement et le namespace Production. Les Services et l'Ingress sont déclarés dans [prod.yaml](../k8s/prod.yaml). Le compte administrateur commun est repris depuis Dev lors de la première installation. Les bases et les bibliothèques des environnements sont indépendantes.
+
+La première installation prépare l'infrastructure et le sharding avec une phase d'initialisation. Les promotions suivantes sauvegardent et vérifient la base Production, puis appliquent le RollingUpdate avec `maxUnavailable: 0` et `maxSurge: 1`. Les migrations additives sont exécutées au démarrage des nouveaux Pods, sur les deux shards.
+
+Pendant le rollout applicatif, [measure-rollout.js](../scripts/measure-rollout.js) sonde continuellement `/api/info` et `/api/stats` via l'Ingress. Il conserve le nombre de requêtes, les erreurs, les révisions observées, la durée et la latence maximale. Une erreur HTTP, un échec Kubernetes ou une absence de convergence fait échouer la promotion. Les preuves sont conservées dans un artefact propre au run de promotion. Un échec nécessite un diagnostic avant un éventuel retour arrière compatible avec le schéma.
+
+Sur ce Docker Desktop de quatre cœurs et environ 4 Gio, les Pods PostgreSQL Production réservent chacun 64 Mio et conservent une limite de 256 Mio. Les réservations Dev/Test restent à 128 Mio. Cette configuration permet la présence des trois environnements et d'un Pod applicatif supplémentaire pendant le rollout.
+
+Pour rejouer le parcours localement avec l'image actuellement déployée en Test, enregistrer sa validation puis promouvoir sa fiche.
+
+```powershell
+$image = kubectl --context docker-desktop -n test get deployment/photo-service -o 'jsonpath={.spec.template.spec.containers[0].image}'
+$revision = (Invoke-RestMethod http://test.localhost/api/info).revision
+.\scripts\deploy-test.ps1 -Image $image -ExpectedRevision $revision -ReleaseFile .\.npm-cache\releases\test-release.json
+.\scripts\promote-production.ps1 -ReleaseFile .\.npm-cache\releases\test-release.json -EvidenceDirectory .\.npm-cache\production-local
+```
+
+Les preuves de travail sont conservées dans des dossiers ignorés par Git. Les runs GitHub antérieurs à l'ajout de la fiche de version nécessitent un nouveau passage du pipeline pour disposer de l'artefact. Le [guide de lancement et d'arrêt](Lancement_Arrêt.md) couvre les trois environnements déjà installés.
+
+Le déclenchement manuel suit le mécanisme GitHub documenté pour les workflows. [Exécution manuelle d'un workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
 
 ### Runner : utilisation et réinstallation
 
@@ -285,4 +323,4 @@ kubectl --context docker-desktop logs -n kube-system deployment/metrics-server -
 
 ## Travaux finaux restants
 
-Sharding, réplication et cache à l'école, basculement, rafraîchissement de la base Test, déploiement Test distant automatisé et validation avant Production, mesure continue du rollout et finalisation de la documentation en ligne. Les sauvegardes, la réplication, le sharding et le cache locaux disposent de procédures de vérification.
+Sharding, réplication, cache et pipeline complet à l'école, basculement, rafraîchissement de la base Test et finalisation de la documentation en ligne. La démonstration finale doit réunir un push GitHub, la validation humaine, la promotion et une évolution réelle du schéma. Les procédures locales couvrent les sauvegardes, la réplication, le sharding, le cache et la mesure du rollout Production.

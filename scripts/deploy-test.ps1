@@ -5,7 +5,8 @@ param(
     [string]$Image,
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^([0-9a-f]{40}|local-[0-9]{14})$')]
-    [string]$ExpectedRevision
+    [string]$ExpectedRevision,
+    [string]$ReleaseFile
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,6 +55,28 @@ try {
         }
     }
     Invoke-Checked curl.exe @('--noproxy', '*', '--fail', '--silent', '--show-error', '--max-time', '5', '-H', 'Host: photo-test.local', 'http://127.0.0.1/healthz')
+    Invoke-Checked curl.exe @('--noproxy', '*', '--fail', '--silent', '--show-error', '--max-time', '5', '-H', 'Host: photo-test.local', 'http://127.0.0.1/readyz')
+    Invoke-Checked curl.exe @('--noproxy', '*', '--fail', '--silent', '--show-error', '--max-time', '5', '-H', 'Host: photo-test.local', 'http://127.0.0.1/api/stats')
+    if ($ReleaseFile) {
+        $imageId = & docker --context desktop-linux image inspect $Image --format '{{.Id}}'
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot record the tested image.' }
+        $rawPods = & kubectl --context docker-desktop -n test get pods -l app=photo-service -o json
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot record tested Pods.' }
+        $pods = @(($rawPods -join "`n" | ConvertFrom-Json).items | Where-Object { -not $_.metadata.deletionTimestamp })
+        $runtimeDigests = @($pods | ForEach-Object { $_.status.containerStatuses[0].imageID -replace '^.*@', '' -replace '^[a-z-]+://', '' } | Select-Object -Unique)
+        if ($runtimeDigests.Count -ne 1 -or $runtimeDigests[0] -notmatch '^sha256:[a-f0-9]{64}$') { throw 'Test Pods must run the same immutable image.' }
+        $release = [ordered]@{
+            schemaVersion=1; image=$Image; imageId="$imageId".Trim(); runtimeDigest=$runtimeDigests[0]
+            revision=$ExpectedRevision; version=$responses[0].version
+            testRunId=$(if ($env:GITHUB_RUN_ID) { $env:GITHUB_RUN_ID } else { 'local' })
+            runAttempt=$(if ($env:GITHUB_RUN_ATTEMPT) { [int]$env:GITHUB_RUN_ATTEMPT } else { 0 })
+            verifiedAtUtc=[DateTime]::UtcNow.ToString('o')
+        }
+        $ReleaseFile = [IO.Path]::GetFullPath($ReleaseFile)
+        [IO.Directory]::CreateDirectory((Split-Path $ReleaseFile -Parent)) | Out-Null
+        $release | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ReleaseFile -Encoding UTF8
+        Write-Host "Validated release recorded in $ReleaseFile."
+    }
     Write-Host "`nPASS: test serves revision $ExpectedRevision via Traefik."
     $responses | Select-Object version, revision, environment, pod | Format-Table
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'get', 'deployment,pods,ingress', '-n', 'test', '-o', 'wide')

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Backup', 'Verify')][string]$Action = 'Backup',
-    [ValidateSet('dev', 'test')][string]$Namespace = 'dev',
+    [ValidateSet('dev', 'test', 'prod')][string]$Namespace = 'dev',
     [string]$BackupFile
 )
 $ErrorActionPreference = 'Stop'
