@@ -15,12 +15,20 @@ kubectl --context docker-desktop get nodes
 # 2. Relancer les bases et attendre leur disponibilité
 kubectl --context docker-desktop -n dev scale statefulset/photo-db --replicas=1
 kubectl --context docker-desktop -n test scale statefulset/photo-db --replicas=1
+kubectl --context docker-desktop -n dev scale statefulset/photo-db-shard-1 --replicas=1
+kubectl --context docker-desktop -n test scale statefulset/photo-db-shard-1 --replicas=1
 kubectl --context docker-desktop -n dev rollout status statefulset/photo-db --timeout=240s
 kubectl --context docker-desktop -n test rollout status statefulset/photo-db --timeout=240s
+kubectl --context docker-desktop -n dev rollout status statefulset/photo-db-shard-1 --timeout=240s
+kubectl --context docker-desktop -n test rollout status statefulset/photo-db-shard-1 --timeout=240s
 kubectl --context docker-desktop -n dev scale statefulset/photo-db-replica --replicas=1
 kubectl --context docker-desktop -n test scale statefulset/photo-db-replica --replicas=1
+kubectl --context docker-desktop -n dev scale statefulset/photo-db-shard-1-replica --replicas=1
+kubectl --context docker-desktop -n test scale statefulset/photo-db-shard-1-replica --replicas=1
 kubectl --context docker-desktop -n dev rollout status statefulset/photo-db-replica --timeout=240s
 kubectl --context docker-desktop -n test rollout status statefulset/photo-db-replica --timeout=240s
+kubectl --context docker-desktop -n dev rollout status statefulset/photo-db-shard-1-replica --timeout=240s
+kubectl --context docker-desktop -n test rollout status statefulset/photo-db-shard-1-replica --timeout=240s
 
 # 3. Relancer le contrôleur Ingress
 kubectl --context docker-desktop -n photo-ingress scale deployment/traefik --replicas=1
@@ -82,10 +90,16 @@ kubectl --context docker-desktop -n test wait --for=delete pod -l app=photo-serv
 # 3. Arrêter les réplicas puis les bases primaires
 kubectl --context docker-desktop -n dev scale statefulset/photo-db-replica --replicas=0
 kubectl --context docker-desktop -n test scale statefulset/photo-db-replica --replicas=0
+kubectl --context docker-desktop -n dev scale statefulset/photo-db-shard-1-replica --replicas=0
+kubectl --context docker-desktop -n test scale statefulset/photo-db-shard-1-replica --replicas=0
 kubectl --context docker-desktop -n dev wait --for=delete pod -l app=photo-db-replica --timeout=180s
 kubectl --context docker-desktop -n test wait --for=delete pod -l app=photo-db-replica --timeout=180s
+kubectl --context docker-desktop -n dev wait --for=delete pod -l app=photo-db-shard-1-replica --timeout=180s
+kubectl --context docker-desktop -n test wait --for=delete pod -l app=photo-db-shard-1-replica --timeout=180s
 kubectl --context docker-desktop -n dev scale statefulset/photo-db --replicas=0
 kubectl --context docker-desktop -n test scale statefulset/photo-db --replicas=0
+kubectl --context docker-desktop -n dev scale statefulset/photo-db-shard-1 --replicas=0
+kubectl --context docker-desktop -n test scale statefulset/photo-db-shard-1 --replicas=0
 
 # 4. Arrêter les dashboards, les métriques et Traefik
 kubectl --context docker-desktop -n monitoring scale statefulset/prometheus statefulset/grafana --replicas=0

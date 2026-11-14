@@ -298,6 +298,19 @@ Cette validation remplace les états précédents indiquant l'arrêt des applica
 Les [résultats structurés](evidence/school-auth-release-2026-11-10.json) conservent les contrôles et la version sans secret. Ce déploiement depuis des applications arrêtées ne constitue pas une démonstration mesurée de zéro interruption.
 
 
+## Sharding PostgreSQL local — 14 novembre 2026
+
+- La version locale 2.3.0 utilise deux shards physiques par environnement Dev/Test, chacun avec son réplica. Huit instances PostgreSQL et huit PVC de 2 Gio sont déployés au total.
+- Dev conserve ses quatre photos, réparties en deux lignes sur le shard 0 et deux sur le shard 1. La comparaison complète des lignes valide la migration initiale. Test conserve une bibliothèque vide.
+- `scripts/sharding.ps1 -Action Check` confirme les partitions, les identifiants de cluster distincts, les compteurs physiques/logiques et le streaming de chaque paire.
+- Le test d'intégration supplémentaire utilise deux bases temporaires isolées. Il couvre la réexécution de la migration, la conservation des images, les statistiques de doublons entre shards, les opérations CRUD, une migration distante, le parcours HTTP authentifié et le refus de readiness lorsque le shard distant est indisponible. Il confirme aussi la limite globale de 2 000 photos avec deux imports concurrents.
+- La suite complète comporte trente tests réussis avec PostgreSQL, aucun ignoré.
+- L'image `photo-service:v2.3.0` a été construite et déployée localement dans Dev et Test. Le déploiement Test a été vérifié par `deploy-test.ps1`, avec la révision `local-20261114024000` servie via Traefik.
+- Les sauvegardes Dev et Test après sharding ont été réunies dans des bases autonomes, archivées puis restaurées et vérifiées. Les tables finales de sauvegarde sont indépendantes des serveurs de shards.
+- Le réplica du second shard Dev a passé le test d'arrêt, de refus des écritures et de rattrapage des changements, avec conservation de son PVC. Les schémas temporaires du test sont supprimés.
+
+La première conversion a utilisé une courte interruption applicative, avec sauvegarde préalable et conservation de la table d'origine dans `sharding_archive.photos`. Cette étape ne constitue pas une preuve de rollout sans interruption. La version reste locale, avec publication GitHub et déploiement école à effectuer séparément.
+
 ## Réplication PostgreSQL locale — 14 novembre 2026
 
 - Dev et Test disposent chacun d'un primaire `photo-db-0` et d'un réplica `photo-db-replica-0`, avec un PVC de 2 Gio par instance.

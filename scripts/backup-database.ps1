@@ -5,11 +5,15 @@ param(
     [string]$BackupFile
 )
 $ErrorActionPreference = 'Stop'
+$previousEncoding = $OutputEncoding
+$OutputEncoding = [Text.UTF8Encoding]::new($false)
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $identifier = [Guid]::NewGuid().ToString('N')
 $remoteArchive = "/tmp/photo-backup-$identifier.dump"
 $verificationDatabase = "photo_restore_$identifier"
 $databaseCreated = $false
+$exportDatabase = "photo_export_$identifier"
+$exportCreated = $false
 
 function Invoke-Kube {
     param([string[]]$Arguments)
@@ -19,6 +23,11 @@ function Invoke-Kube {
 function Invoke-Database {
     param([string[]]$Arguments)
     Invoke-Kube (@('exec', 'photo-db-0', '-c', 'postgres', '--') + $Arguments)
+}
+function Invoke-DatabaseScript {
+    param([string]$Database, [string]$Sql)
+    $Sql | & kubectl --context docker-desktop -n $Namespace exec -i photo-db-0 -c postgres -- psql -X -U photo -d $Database -v ON_ERROR_STOP=1
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot create the portable backup snapshot.' }
 }
 
 if (-not $BackupFile) {
@@ -33,7 +42,37 @@ try {
     Invoke-Database @('pg_isready', '-U', 'photo', '-d', 'photo_service', '-t', '5')
     if ($Action -eq 'Backup') {
         [IO.Directory]::CreateDirectory((Split-Path $BackupFile -Parent)) | Out-Null
-        Invoke-Database @('pg_dump', '-U', 'photo', '-d', 'photo_service', '--format=custom', '--no-owner', '--no-acl', '--file', $remoteArchive)
+        $sourceDatabase = 'photo_service'
+        $sharded = Invoke-Database @('psql', '-X', '-U', 'photo', '-d', 'photo_service', '-Atc', "SELECT to_regclass('public.photo_sharding') IS NOT NULL;")
+        if (($sharded -join '').Trim() -eq 't') {
+            # Flatten distributed rows into a standalone database before pg_dump.
+            # Restoring this archive never reconnects to the active shard servers.
+            Invoke-Database @('createdb', '-U', 'photo', '--template=template0', $exportDatabase)
+            $exportCreated = $true
+            Invoke-DatabaseScript $exportDatabase 'CREATE TABLE schema_migrations(version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now());' | Out-Null
+            foreach ($migration in (Get-ChildItem -LiteralPath (Join-Path $projectRoot 'migrations') -Filter '*.sql' | Where-Object { $_.Name -match '^\d+[-\w]*\.sql$' } | Sort-Object Name)) {
+                Invoke-DatabaseScript $exportDatabase (Get-Content -LiteralPath $migration.FullName -Raw) | Out-Null
+            }
+            $exportSql = @'
+CREATE EXTENSION postgres_fdw;
+CREATE SCHEMA backup_source;
+CREATE SERVER backup_source FOREIGN DATA WRAPPER postgres_fdw OPTIONS(host '/var/run/postgresql',dbname 'photo_service');
+CREATE USER MAPPING FOR photo SERVER backup_source OPTIONS(user 'photo');
+IMPORT FOREIGN SCHEMA public LIMIT TO(photos,schema_migrations,auth_sessions,auth_attempts) FROM SERVER backup_source INTO backup_source;
+BEGIN ISOLATION LEVEL REPEATABLE READ;
+INSERT INTO public.photos SELECT * FROM backup_source.photos;
+INSERT INTO public.schema_migrations SELECT * FROM backup_source.schema_migrations;
+INSERT INTO public.auth_sessions SELECT * FROM backup_source.auth_sessions;
+INSERT INTO public.auth_attempts SELECT * FROM backup_source.auth_attempts;
+COMMIT;
+DROP SCHEMA backup_source CASCADE;
+DROP SERVER backup_source CASCADE;
+DROP EXTENSION postgres_fdw;
+'@
+            Invoke-DatabaseScript $exportDatabase $exportSql | Out-Null
+            $sourceDatabase = $exportDatabase
+        }
+        Invoke-Database @('pg_dump', '-U', 'photo', '-d', $sourceDatabase, '--format=custom', '--no-owner', '--no-acl', '--file', $remoteArchive)
         # kubectl cp preserves binary archives on Windows PowerShell 5.1.
         Push-Location (Split-Path $BackupFile -Parent)
         try {
@@ -46,7 +85,10 @@ try {
             Invoke-Kube @('cp', '-c', 'postgres', ('./' + [IO.Path]::GetFileName($BackupFile)), "photo-db-0:$remoteArchive")
         } finally { Pop-Location }
     }
-    Invoke-Database @('pg_restore', '--list', $remoteArchive) | Out-Null
+    $contents = Invoke-Database @('pg_restore', '--list', $remoteArchive)
+    if (($contents -join "`n") -match '\s(FOREIGN TABLE|SERVER|USER MAPPING)\s') {
+        throw 'Expected a portable archive without external database connections.'
+    }
     Invoke-Database @('createdb', '-U', 'photo', '--template=template0', $verificationDatabase)
     $databaseCreated = $true
     Invoke-Database @('pg_restore', '-U', 'photo', '--dbname', $verificationDatabase, '--no-owner', '--no-acl', '--exit-on-error', '--single-transaction', $remoteArchive)
@@ -80,6 +122,11 @@ SELECT json_build_object(
         & kubectl --context docker-desktop -n $Namespace exec photo-db-0 -c postgres -- dropdb -U photo --if-exists $verificationDatabase
         if ($LASTEXITCODE -ne 0) { Write-Warning "Temporary database cleanup required: $verificationDatabase" }
     }
+    if ($exportCreated) {
+        & kubectl --context docker-desktop -n $Namespace exec photo-db-0 -c postgres -- dropdb -U photo --if-exists $exportDatabase
+        if ($LASTEXITCODE -ne 0) { Write-Warning "Temporary export cleanup required: $exportDatabase" }
+    }
     & kubectl --context docker-desktop -n $Namespace exec photo-db-0 -c postgres -- rm -f $remoteArchive
     if ($LASTEXITCODE -ne 0) { Write-Warning "Temporary archive cleanup required: $remoteArchive" }
+    $OutputEncoding = $previousEncoding
 }

@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { Client, Pool } = require('pg');
 const { readdir, readFile } = require('node:fs/promises');
 const path = require('node:path');
 
@@ -26,16 +26,34 @@ async function migrate(pool) {
 }
 
 function createDatabase(config = {}) {
-  const pool = new Pool({
+  const { shardConnectionString, ...connectionConfig } = config;
+  const poolOptions = {
     max: 5, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10000,
-    ...(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {}), ...config,
-  });
+    ...(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {}), ...connectionConfig,
+  };
+  const pool = new Pool(poolOptions);
+  let sharded = false;
   pool.on('error', () => console.error('Idle database connection failed.'));
   return {
     pool,
-    migrate: () => migrate(pool),
+    migrate: async () => {
+      const layoutExists = (await pool.query("SELECT to_regclass('photo_sharding') IS NOT NULL AS present")).rows[0].present;
+      if (layoutExists) {
+        const layout = (await pool.query('SELECT shard_host, shard_database FROM photo_sharding WHERE singleton')).rows[0];
+        const connection = new Client(poolOptions).connectionParameters;
+        const worker = new Pool({ ...poolOptions, connectionString: shardConnectionString,
+          user: connection.user, password: connection.password, port: connection.port, ssl: connection.ssl,
+          host: layout.shard_host, database: layout.shard_database });
+        try { await migrate(worker); } finally { await worker.end(); }
+      }
+      await migrate(pool);
+      sharded = layoutExists;
+    },
     close: () => pool.end(),
-    ready: async () => { await pool.query('SELECT 1'); },
+    ready: async () => {
+      await pool.query('SELECT 1');
+      if (sharded) await pool.query('SELECT id FROM photos_shard_1 LIMIT 1');
+    },
     authSession: async (hash, credential) => (await pool.query(
       'SELECT csrf_token FROM auth_sessions WHERE token_hash=$1 AND credential_id=$2 AND expires_at>now()', [hash, credential])).rows[0],
     authDelete: async hash => { await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1', [hash]); },

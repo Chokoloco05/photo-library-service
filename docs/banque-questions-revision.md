@@ -18,7 +18,7 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **1. Question : ★ Présente le projet en une minute : son objectif, ce qui fonctionne déjà et ce qui reste à développer.**
 
-**Réponse :** J’ai réalisé une photothèque appelée Clair, déployée avec trois répliques dans Kubernetes. Le premier milestone apporte la réplication et l’Ingress ; le deuxième automatise les tests, le build et le rollout dans Test ; le troisième ajoute Headlamp pour surveiller et dimensionner les services. La version actuelle conserve les photos dans PostgreSQL et détecte les doublons. La Production, le cache répliqué, le sharding et la réplication de la base restent à terminer.
+**Réponse :** J’ai réalisé une photothèque appelée Clair, déployée avec trois répliques dans Kubernetes. Le premier milestone apporte les répliques applicatives et l’Ingress. Le deuxième automatise les tests, le build et le rollout dans Test. Le troisième utilise Headlamp pour surveiller et dimensionner les services. Grafana et Prometheus complètent la supervision. La version locale actuelle conserve les photos dans deux shards PostgreSQL par environnement, chacun répliqué, et détecte les doublons. Le cache répliqué et la promotion automatisée vers Production restent à réaliser.
 
 **2. Question : ★ Décris le parcours d'une requête depuis le navigateur jusqu'au code Express.**
 
@@ -216,7 +216,7 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **48. Question : ★ Que faudrait-il ajouter avant un usage en production ? Classe tes propositions par besoin concret.**
 
-**Réponse :** Le stockage persistant et la supervision sont déjà présents. Il reste notamment TLS et contrôle d’accès applicatif, sauvegardes testées, résilience sur plusieurs nœuds, réplication et sharding de la base, cache répliqué, tests de charge et promotion vers Production. Le namespace prod existe, mais l’application n’y est pas encore déployée.
+**Réponse :** Le stockage persistant, le compte administrateur, la supervision, les sauvegardes testées, le sharding et la réplication locale sont présents. Il reste notamment TLS à l'école, résilience sur plusieurs nœuds, basculement automatique des bases, cache répliqué, rafraîchissement Test et promotion automatisée vers Production. Les trois applications école sont déployées dans `team5`, avec une architecture de base encore à faire évoluer.
 
 ## Milestone 1 — Justifier et démontrer mes choix
 
@@ -369,7 +369,7 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **84. Question : Si je passe le StatefulSet PostgreSQL à trois répliques dans Headlamp, ai-je une base répliquée et shardée ?**
 
-**Réponse :** Non. Multiplier les Pods ne configure ni la réplication PostgreSQL ni le partage des données. Chaque environnement possède sa base indépendante : Dev/Test localement, et Dev/Test/Production dans `team5` à l’école. Ce sont des environnements séparés, pas des réplicas d’une même base. Le sharding et la réplication restent à implémenter.
+**Réponse :** La réplication nécessite une configuration PostgreSQL. Localement, chaque environnement Dev/Test utilise désormais deux shards physiques répartis par hachage de l'UUID, chacun avec un réplica alimenté par les WAL. Le coordinateur utilise une partition locale et une partition étrangère `postgres_fdw`. Les vérifications contrôlent le streaming, la distribution et le rattrapage après un arrêt. Le déploiement de cette architecture à l'école reste à préparer.
 
 
 **85. Question : ★ Quelle migration de schéma peux-tu expliquer avec un exemple concret ?**
@@ -382,12 +382,12 @@ Commencer par les questions ★, puis les trois présentations orales et les dé
 
 **87. Question : L’application est-elle déjà en ligne sur le domaine de l’école ? Le fichier HTTPRoute suffit-il ?**
 
-**Réponse :** Les trois environnements sont déployés dans le namespace `team5` à l’école et ont passé les tests internes. La HTTPRoute est acceptée et ses Services sont résolus, mais le domaine renvoie NXDOMAIN depuis les points testés. L’accès web externe attend la configuration DNS ou les indications VPN du professeur. Le kubeconfig donne accès à l’API Kubernetes ; il ne crée pas le DNS.
+**Réponse :** Le déploiement école du 10 novembre a validé les trois environnements dans `team5` et leurs pages/API sur le domaine. La HTTPRoute relie les chemins aux Services, tandis que le DNS et la Gateway relèvent aussi de la configuration de l'école. Le kubeconfig fournit l'accès administratif à l'API Kubernetes. La nouvelle architecture locale shardée reste à porter sur ce cluster.
 
 
 **88. Question : ★ Qu’est-ce que je ne dois pas annoncer comme terminé ?**
 
-**Réponse :** Les trois milestones ont des réalisations et des preuves locales, mais la note dépend de la présentation et de l’évaluateur. Je n’annonce pas encore de base shardée/répliquée, de cache répliqué, de rafraîchissement Test depuis Production, de promotion Production ou de preuve complète sans interruption. Le pipeline GitHub est vert ; son déploiement Test cible encore le cluster local. À l’école, le DNS externe et les permissions du dashboard restent à régler.
+**Réponse :** Les trois milestones disposent de réalisations et de preuves locales. La réplication et le sharding sont vérifiés sur Docker Desktop. Le cache répliqué, le rafraîchissement Test depuis Production, la promotion automatisée vers Production et la mesure complète sans interruption restent à réaliser. Le pipeline Test cible encore le cluster local. Le transfert de l'architecture de données et du monitoring vers l'école reste à préparer avec les permissions disponibles.
 
 ## Trois présentations prêtes pour l’oral
 
@@ -466,7 +466,7 @@ curl.exe --noproxy "*" --fail --silent --show-error http://localhost/readyz
 
 ### Bonus — Montrer que la photothèque est réelle
 
-Importer deux fois une photo, ouvrir Doublons exacts, sélectionner les deux copies et comparer. Montrer le poids récupérable, télécharger une copie, puis supprimer l’autre avec confirmation. Modifier ensuite un titre ou une description et actualiser pour constater la persistance. Expliquer que PostgreSQL est partagé par les Pods, mais n’est pas encore répliqué.
+Importer deux fois une photo, ouvrir Doublons exacts, sélectionner les deux copies et comparer. Montrer le poids récupérable, télécharger une copie, puis supprimer l’autre avec confirmation. Modifier ensuite un titre ou une description et actualiser pour constater la persistance. Expliquer que les Pods partagent une table logique distribuée entre deux serveurs PostgreSQL locaux, chacun répliqué.
 
 ## Fichiers et preuves à savoir retrouver
 

@@ -83,7 +83,7 @@ Dev, depuis la racine du projet avec Docker Desktop et Kubernetes démarrés :
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-docker-desktop.ps1
 ```
 
-Le script construit `photo-service:v2.2.0`, installe la base Dev si nécessaire, puis déploie trois Pods applicatifs. Pour Test, le pipeline GitHub existant construit une image unique puis appelle `deploy-test.ps1`, qui prépare désormais aussi la base Test.
+Le script construit `photo-service:v2.3.0`, installe la base Dev si nécessaire, puis déploie trois Pods applicatifs. Une installation avec sharding activé prépare également le second shard et son réplica. Pour Test, le pipeline GitHub existant construit une image unique puis appelle `deploy-test.ps1`, qui prépare aussi les bases Test.
 
 `scripts/database.ps1` crée un mot de passe aléatoire par environnement dans le Secret Kubernetes `photo-db`. Il conserve le Secret existant à chaque lancement. Ne pas supprimer ce Secret indépendamment du PVC : le mot de passe du PostgreSQL déjà initialisé ne changerait pas automatiquement.
 
@@ -164,7 +164,7 @@ Ils vérifient aussi la migration d’une base contenant déjà une photo, l’a
 
 ## Sauvegarde et restauration locale
 
-Le script utilise `pg_dump` au format custom et restaure l'archive avec `pg_restore --single-transaction` dans une base temporaire nommée `photo_restore_<identifiant>`. Le contrôle vérifie les tables applicatives, les migrations, la taille et le SHA-256 des originaux ainsi que la présence des miniatures. La base temporaire est supprimée à la fin.
+Le script utilise `pg_dump` au format custom et restaure l'archive avec `pg_restore --single-transaction` dans une base temporaire nommée `photo_restore_<identifiant>`. Avec le sharding, une première base temporaire réunit les photos des deux serveurs et recrée les tables à partir des migrations du dépôt. L'archive finale contient une base autonome. Le contrôle vérifie les tables applicatives, les migrations, la taille et le SHA-256 des originaux ainsi que la présence des miniatures. Les bases temporaires sont supprimées à la fin.
 
 Depuis la racine du projet, avec les bases locales démarrées, sauvegarder chaque environnement. Chaque commande vérifie immédiatement sa restauration.
 
@@ -206,4 +206,4 @@ Références officielles de la procédure de sauvegarde et de restauration. [pg_
 
 Le navigateur reçoit l’interface HTML sur `/`. Les anciens appels curl sans en-tête `Accept: text/html` reçoivent encore l’identité JSON ; le pipeline Test utilise explicitement `/api/info`.
 
-Limites de cette version : 10 Mo par photo, 24 mégapixels, JPEG/PNG/WebP non animés, 2 000 photos par environnement, 100 paires de similitude affichées. Le PVC de 2 Gi impose également une capacité réelle de stockage. Le calcul des ressemblances est quadratique et volontairement destiné aux petites bibliothèques de démonstration.
+Limites de cette version — 10 Mo par photo, 24 mégapixels, JPEG/PNG/WebP non animés, 2 000 photos par environnement et 100 paires de similitude affichées. Chaque PVC de 2 Gio impose également une capacité réelle de stockage. Le calcul des ressemblances est quadratique et destiné aux petites bibliothèques de démonstration.

@@ -21,7 +21,7 @@ Navigateur -> Traefik partagé -> règle Ingress -> Service -> 3 Pods Express
 | Traefik | Applique les règles et expose l'entrée LoadBalancer : [contrôleur](../infra/docker-desktop/traefik.yaml) |
 | PostgreSQL | Service, StatefulSet et stockage persistant : [manifeste](../k8s/database.yaml) |
 
-Le milestone 1 a commencé avec une API fictive sans base. La version actuelle héberge Clair et PostgreSQL. Chaque environnement local Dev/Test dispose de son propre primaire PostgreSQL et de son réplica. Le cluster Docker Desktop utilise un seul nœud et dépend de la disponibilité du PC.
+Le milestone 1 a commencé avec une API fictive sans base. La version actuelle héberge Clair et PostgreSQL. Chaque environnement local Dev/Test dispose de deux shards PostgreSQL, chacun avec son primaire et son réplica. Le cluster Docker Desktop utilise un seul nœud et dépend de la disponibilité du PC.
 
 Le [Dockerfile](../Dockerfile) installe les dépendances dans un premier stage puis copie l'application, les ressources web et les migrations dans un runtime non-root. `package-lock.json` est indispensable pour reproduire l'installation. `EXPOSE 3000 9090` documente les ports applicatif et de métriques. Leur exposition réseau dépend des Services.
 
@@ -38,7 +38,7 @@ curl.exe --noproxy "*" --fail -H "Host: photo.local" http://127.0.0.1/api/info
 
 ## Réplication PostgreSQL locale
 
-Chaque namespace Dev/Test contient un primaire `photo-db-0` et un réplica `photo-db-replica-0`, chacun avec son PVC de 2 Gio. Le Service `photo-db` sélectionne exclusivement le primaire et reste l'adresse utilisée par Clair. Le Service `photo-db-replica` permet les lectures SQL sur la copie.
+Chaque shard Dev/Test contient un primaire et un réplica, chacun avec son PVC de 2 Gio. Le shard 0 utilise `photo-db-0` et `photo-db-replica-0`. Le shard 1 utilise `photo-db-shard-1-0` et `photo-db-shard-1-replica-0`. Le Service `photo-db` sélectionne le primaire coordinateur et reste l'adresse utilisée par Clair.
 
 Le réplica est initialisé par `pg_basebackup`, vérifié par `pg_verifybackup`, puis reçoit les journaux WAL en streaming. Son PVC permet de reprendre la réplication après redémarrage. Les photos, miniatures, schémas, migrations et sessions sont copiés par la réplication physique. La copie initiale utilise un répertoire de préparation, publié seulement après sa vérification.
 
@@ -67,6 +67,46 @@ Le slot physique `photo_standby` conserve les WAL nécessaires au réplica, avec
 Le [guide de lancement et d'arrêt](Lancement_Arrêt.md) inclut désormais les deux réplicas. Les [sauvegardes et restaurations](application.md#sauvegarde-et-restauration-locale) restent nécessaires pour récupérer des données supprimées accidentellement. Cette configuration est installée localement, avec une préparation du cluster école encore à réaliser.
 
 Les mécanismes sont décrits dans les documentations officielles de PostgreSQL. [Streaming replication](https://www.postgresql.org/docs/17/warm-standby.html), [pg_basebackup](https://www.postgresql.org/docs/17/app-pgbasebackup.html).
+
+## Sharding PostgreSQL local
+
+La version 2.3.0 répartit les photos par hachage de leur UUID entre deux serveurs PostgreSQL indépendants par environnement. Le primaire `photo-db` conserve le shard 0 et coordonne les requêtes. Le serveur `photo-db-shard-1` conserve le shard 1. Chaque serveur possède son réplica physique. Les quatre instances d'un environnement disposent de volumes distincts, soit 8 Gio de stockage provisionné.
+
+La table logique `photos` utilise `PARTITION BY HASH(id)` avec deux partitions. `photos_shard_0` est stockée sur le coordinateur et `photos_shard_1` est une table étrangère `postgres_fdw` reliée à la table `photos` du second serveur. Les lectures, imports, modifications et suppressions passent par la table logique. Les contraintes d'unicité des UUID sont portées par les tables physiques. Les sessions administrateur et le budget de connexion restent sur le coordinateur, avec sa réplication.
+
+```text
+Clair -> photo-db / table logique photos
+          |-- hash 0 -> photos_shard_0 -> réplica du shard 0
+          `-- hash 1 -> postgres_fdw -> photo-db-shard-1 -> réplica du shard 1
+```
+
+Depuis une installation locale existante avec les bases et l'application démarrées, installer puis vérifier la distribution.
+
+```powershell
+.\scripts\sharding.ps1 -Namespace dev -Action Install
+.\scripts\sharding.ps1 -Namespace test -Action Install
+.\scripts\sharding.ps1 -Namespace dev -Action Check
+.\scripts\sharding.ps1 -Namespace test -Action Check
+```
+
+L'installation sauvegarde et vérifie la base existante avant sa première conversion, prépare le second serveur et son réplica, applique les migrations, puis arrête brièvement l'application pour répartir les données. La comparaison des lignes vérifie la copie avant validation. Le nombre initial de Pods applicatifs est restauré à la fin. La table d'origine reste dans `sharding_archive.photos` comme copie préalable à la migration. Elle conserve l'état initial, tandis que les nouvelles écritures alimentent les partitions actives.
+
+Le marqueur ConfigMap `photo-db-sharding` permet au script habituel `database.ps1` de relancer et vérifier automatiquement les deux paires. Les migrations applicatives démarrent sur le shard distant puis sur le coordinateur. Cette séquence convient aux migrations additives utilisées par le projet. Une évolution destructive exige une procédure de déploiement compatible avec les versions encore en service.
+
+Le contrôle compare les compteurs logiques aux données physiques et confirme que les deux primaires ont des identifiants de cluster PostgreSQL distincts. La readiness et la métrique de disponibilité de la version 2.3.0 incluent le shard distant. La limite de 2 000 photos reste globale et les imports concurrents utilisent le verrou du coordinateur pour la respecter.
+
+Les transactions métier d'import, de modification et de suppression ciblent une photo et son shard. `postgres_fdw` ne fournit pas de commit atomique distribué garanti en présence d'une panne pendant un commit multi-serveurs. La copie initiale est réexécutable avec comparaison des données, et l'ancienne table reste disponible. La modification du nombre de shards et le basculement automatique restent des évolutions distinctes.
+
+Les sauvegardes construisent une base temporaire autonome avec les photos réunies, leurs contraintes issues des migrations et les tables applicatives. L'archive finale est restaurée et vérifiée dans une autre base isolée. Elle contient des tables ordinaires et permet une restauration indépendante des serveurs de shards. Le processus de sauvegarde utilise le socket PostgreSQL local déjà configuré pour le compte `photo` sur Docker Desktop.
+
+Pour exercer le redémarrage et le rattrapage du réplica du second shard, utiliser la même procédure que pour le premier.
+
+```powershell
+.\scripts\test-database-replication.ps1 -Namespace dev -DatabaseName photo-db-shard-1
+.\scripts\test-database-replication.ps1 -Namespace test -DatabaseName photo-db-shard-1
+```
+
+Cette architecture est déployée localement. Sa transposition à `team5` et les ressources correspondantes restent à préparer. Les choix SQL s'appuient sur les mécanismes PostgreSQL de partitionnement et de tables étrangères. [Partitionnement](https://www.postgresql.org/docs/17/ddl-partitioning.html), [postgres_fdw](https://www.postgresql.org/docs/17/postgres-fdw.html).
 
 ## Pipeline GitHub et milestone 2
 
@@ -215,4 +255,4 @@ kubectl --context docker-desktop logs -n kube-system deployment/metrics-server -
 
 ## Travaux finaux restants
 
-Sharding PostgreSQL, réplication à l'école et basculement, cache répliqué, rafraîchissement de la base Test, déploiement Test distant automatisé et validation avant Production, mesure continue du rollout et finalisation de la documentation en ligne. Les sauvegardes et la réplication locale disposent de procédures de vérification.
+Sharding et réplication à l'école, basculement, cache répliqué, rafraîchissement de la base Test, déploiement Test distant automatisé et validation avant Production, mesure continue du rollout et finalisation de la documentation en ligne. Les sauvegardes, la réplication et le sharding locaux disposent de procédures de vérification.

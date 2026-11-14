@@ -1,6 +1,6 @@
 {
   "name": "photo-service",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "description": "Photo Library Service - Kubernetes deployment pipeline",
   "scripts": {

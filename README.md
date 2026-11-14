@@ -39,11 +39,11 @@ Avec Docker Desktop et Kubernetes démarrés, suivre le [lancement](docs/applica
 - Test : http://test.localhost/
 - Headlamp : http://dashboard.localhost/ — [connexion et scaling](docs/infrastructure.md#monitoring-et-milestone-3).
 
-Grafana et Prometheus sont installés localement avec la version 2.2.0 en préparation. Le [guide de supervision](docs/infrastructure.md#prometheus-et-grafana) décrit les graphiques, la collecte et le trafic de démonstration. Ouvrir [le dashboard Clair](http://grafana.localhost/d/clair/clair).
+Grafana et Prometheus sont installés localement. Le [guide de supervision](docs/infrastructure.md#prometheus-et-grafana) décrit les graphiques, la collecte et le trafic de démonstration. Ouvrir [le dashboard Clair](http://grafana.localhost/d/clair/clair).
 
 ## Structure du dépôt
 
-La réplication PostgreSQL locale est préparée dans le dossier de travail, avec un primaire et un réplica persistant dans chaque namespace Dev/Test. Les [procédures de réplication](docs/infrastructure.md#réplication-postgresql-locale) et de [sauvegarde](docs/application.md#sauvegarde-et-restauration-locale) décrivent leur installation et leurs contrôles.
+La version locale 2.3.0 répartit les photos entre deux shards PostgreSQL par environnement, chacun avec son réplica persistant. Les [procédures de sharding](docs/infrastructure.md#sharding-postgresql-local), de [réplication](docs/infrastructure.md#réplication-postgresql-locale) et de [sauvegarde](docs/application.md#sauvegarde-et-restauration-locale) décrivent leur installation et leurs contrôles. Cette évolution est préparée dans le dossier de travail.
 
 | Emplacement | Rôle |
 | --- | --- |
