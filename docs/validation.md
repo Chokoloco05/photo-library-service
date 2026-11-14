@@ -298,6 +298,30 @@ Cette validation remplace les états précédents indiquant l'arrêt des applica
 Les [résultats structurés](evidence/school-auth-release-2026-11-10.json) conservent les contrôles et la version sans secret. Ce déploiement depuis des applications arrêtées ne constitue pas une démonstration mesurée de zéro interruption.
 
 
+## Réplication PostgreSQL locale — 14 novembre 2026
+
+- Dev et Test disposent chacun d'un primaire `photo-db-0` et d'un réplica `photo-db-replica-0`, avec un PVC de 2 Gio par instance.
+- Les deux connexions de réplication sont en état `streaming`, mode `async`, avec zéro octet de retard lors des contrôles finaux.
+- Les empreintes des originaux, miniatures et métadonnées des quatre photos Dev correspondent entre primaire et réplica. La base Test reste vide.
+- Le test reproductible `scripts/test-database-replication.ps1` a été exécuté dans les deux namespaces. Il valide une écriture répliquée, le refus des écritures sur le réplica, la reprise après arrêt du réplica et le rattrapage d'une écriture effectuée pendant son arrêt.
+- Le PVC de chaque réplica conserve son UID pendant l'exercice. Les schémas de vérification sont supprimés à la fin.
+- Une seconde installation Dev a réussi avec les Secrets et volumes existants. Le primaire Dev a ensuite été redémarré et le streaming a repris.
+- Les API readiness Dev et Test répondent HTTP 200 après les vérifications. Les bases primaires et les données utilisateur ont été conservées.
+
+Cette installation reste locale. Le basculement automatique, la répartition des lectures applicatives et le sharding restent à réaliser. La configuration n'a pas été déployée sur le cluster école.
+
+## Sauvegarde et restauration PostgreSQL — 14 novembre 2026
+
+Le script `scripts/backup-database.ps1` a sauvegardé Dev et Test avec `pg_dump` et restauré chaque archive dans une base temporaire dédiée, avec arrêt sur erreur et transaction unique. Les archives binaires sont transférées avec `kubectl cp` et conservées localement dans le dossier ignoré `backups/`.
+
+- Dev contient quatre photos et trois migrations dans la restauration vérifiée.
+- Test contient zéro photo et trois migrations dans la restauration vérifiée.
+- La vérification a été répétée depuis les archives existantes. Les originaux restaurés passent les contrôles de taille et de SHA-256, et leurs miniatures sont présentes.
+- Les bases temporaires ont été supprimées après vérification. Les bases applicatives et leurs volumes ont été conservés.
+- Le compte rendu local de chaque archive conserve son empreinte SHA-256 et les compteurs de restauration.
+
+Cette validation concerne la restauration locale sur le serveur PostgreSQL existant. La réplication, le sharding et le rafraîchissement de Test depuis Production restent à réaliser.
+
 ## Prometheus et Grafana locaux — 14 novembre 2026
 
 - Version locale 2.2.0, Prometheus 3.16.0 et Grafana 13.3.1 installés sur Docker Desktop. Les six Pods Dev/Test, leurs deux bases, Metrics Server et Headlamp sont prêts.

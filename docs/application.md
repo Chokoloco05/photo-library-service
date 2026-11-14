@@ -162,6 +162,29 @@ Les tests d’intégration sont activés quand `TEST_DATABASE_URL` est défini. 
 
 Ils vérifient aussi la migration d’une base contenant déjà une photo, l’accès partagé depuis deux instances, les téléchargements à l’identique et les opérations de bibliothèque. Les [preuves de validation](validation.md#application) décrivent aussi les vérifications réalisées sur Kubernetes et dans Chrome.
 
+## Sauvegarde et restauration locale
+
+Le script utilise `pg_dump` au format custom et restaure l'archive avec `pg_restore --single-transaction` dans une base temporaire nommée `photo_restore_<identifiant>`. Le contrôle vérifie les tables applicatives, les migrations, la taille et le SHA-256 des originaux ainsi que la présence des miniatures. La base temporaire est supprimée à la fin.
+
+Depuis la racine du projet, avec les bases locales démarrées, sauvegarder chaque environnement. Chaque commande vérifie immédiatement sa restauration.
+
+```powershell
+.\scripts\backup-database.ps1 -Namespace dev
+.\scripts\backup-database.ps1 -Namespace test
+```
+
+Pour vérifier de nouveau une archive existante, renseigner le chemin affiché lors de sa création.
+
+```powershell
+.\scripts\backup-database.ps1 -Action Verify -Namespace dev -BackupFile .\backups\nom-de-la-sauvegarde.dump
+```
+
+Les archives et comptes rendus `*.verified.json` sont conservés dans `backups/`, exclu de Git. Le compte rendu contient l'empreinte SHA-256 de l'archive et les compteurs restaurés. Une sauvegarde contient les photos et les tables de sessions administrateur. Elle doit être conservée dans un emplacement privé. Copier les archives validées sur un stockage distinct du PC pour disposer d'une copie en cas de panne locale.
+
+Cette procédure cible PostgreSQL local dans les namespaces Dev et Test. La vérification crée une base isolée sur le même serveur PostgreSQL et consomme temporairement de l'espace supplémentaire. La restauration inclut le schéma et les données de la base applicative. Les rôles PostgreSQL et les Secrets Kubernetes sont configurés séparément. Le rafraîchissement de Test depuis Production reste à implémenter.
+
+Références officielles de la procédure de sauvegarde et de restauration. [pg_dump](https://www.postgresql.org/docs/17/app-pgdump.html), [pg_restore](https://www.postgresql.org/docs/17/app-pgrestore.html).
+
 ## API
 
 | Méthode et chemin | Rôle |

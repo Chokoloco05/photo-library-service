@@ -43,6 +43,8 @@ Grafana et Prometheus sont installés localement avec la version 2.2.0 en prépa
 
 ## Structure du dépôt
 
+La réplication PostgreSQL locale est préparée dans le dossier de travail, avec un primaire et un réplica persistant dans chaque namespace Dev/Test. Les [procédures de réplication](docs/infrastructure.md#réplication-postgresql-locale) et de [sauvegarde](docs/application.md#sauvegarde-et-restauration-locale) décrivent leur installation et leurs contrôles.
+
 | Emplacement | Rôle |
 | --- | --- |
 | `app.js`, `server.js`, `identity.js`, `photos.js` | Serveur, identité des Pods et traitement des photos |

@@ -1,0 +1,94 @@
+# Namespace is supplied by scripts/database.ps1.
+apiVersion: v1
+kind: Service
+metadata:
+  name: photo-db-replica
+spec:
+  clusterIP: None
+  selector:
+    app: photo-db-replica
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: photo-db-replica
+spec:
+  serviceName: photo-db-replica
+  replicas: 1
+  selector:
+    matchLabels:
+      app: photo-db-replica
+  template:
+    metadata:
+      labels:
+        app: photo-db-replica
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: postgres
+          image: postgres:17.6-alpine
+          command: [sh, /opt/replication/start-replica.sh]
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/replica
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: scripts
+              mountPath: /opt/replication
+              readOnly: true
+            - name: replication
+              mountPath: /run/replication
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          startupProbe:
+            exec:
+              command: [pg_isready, -U, photo, -d, photo_service, -t, '3']
+            timeoutSeconds: 5
+            periodSeconds: 5
+            failureThreshold: 120
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -ec
+                - |
+                  test "$(psql -X -U photo -d photo_service -Atc "SELECT pg_is_in_recovery() AND EXISTS (SELECT FROM pg_stat_wal_receiver WHERE status='streaming')")" = t
+            timeoutSeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, photo, -d, photo_service, -t, '3']
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+      volumes:
+        - name: scripts
+          configMap:
+            name: photo-db-replication
+        - name: replication
+          secret:
+            secretName: photo-db-replication
+            defaultMode: 0444
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi

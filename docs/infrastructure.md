@@ -21,7 +21,7 @@ Navigateur -> Traefik partagé -> règle Ingress -> Service -> 3 Pods Express
 | Traefik | Applique les règles et expose l'entrée LoadBalancer : [contrôleur](../infra/docker-desktop/traefik.yaml) |
 | PostgreSQL | Service, StatefulSet et stockage persistant : [manifeste](../k8s/database.yaml) |
 
-Le milestone 1 a commencé avec une API fictive sans base. La version actuelle héberge Clair et PostgreSQL. Trois Pods sur un nœud démontrent la réplication applicative, pas la résistance à une panne du PC. Les bases Dev/Test sont indépendantes ; ce ne sont pas des réplicas PostgreSQL.
+Le milestone 1 a commencé avec une API fictive sans base. La version actuelle héberge Clair et PostgreSQL. Chaque environnement local Dev/Test dispose de son propre primaire PostgreSQL et de son réplica. Le cluster Docker Desktop utilise un seul nœud et dépend de la disponibilité du PC.
 
 Le [Dockerfile](../Dockerfile) installe les dépendances dans un premier stage puis copie l'application, les ressources web et les migrations dans un runtime non-root. `package-lock.json` est indispensable pour reproduire l'installation. `EXPOSE 3000 9090` documente les ports applicatif et de métriques. Leur exposition réseau dépend des Services.
 
@@ -35,6 +35,38 @@ curl.exe --noproxy "*" --fail -H "Host: photo.local" http://127.0.0.1/api/info
 ```
 
 `/whoami` indique le Pod qui répond. Une distribution parfaitement égale n'est pas exigée. Un port-forward direct vers le Service applicatif contourne l'Ingress et ne valide donc pas le parcours Traefik.
+
+## Réplication PostgreSQL locale
+
+Chaque namespace Dev/Test contient un primaire `photo-db-0` et un réplica `photo-db-replica-0`, chacun avec son PVC de 2 Gio. Le Service `photo-db` sélectionne exclusivement le primaire et reste l'adresse utilisée par Clair. Le Service `photo-db-replica` permet les lectures SQL sur la copie.
+
+Le réplica est initialisé par `pg_basebackup`, vérifié par `pg_verifybackup`, puis reçoit les journaux WAL en streaming. Son PVC permet de reprendre la réplication après redémarrage. Les photos, miniatures, schémas, migrations et sessions sont copiés par la réplication physique. La copie initiale utilise un répertoire de préparation, publié seulement après sa vérification.
+
+Le rôle `photo_replicator` possède les droits LOGIN et REPLICATION. Son mot de passe aléatoire est conservé dans un Secret propre à chaque namespace. La connexion utilise SCRAM sur le réseau interne du cluster. Une mise en production exige de compléter cette liaison avec TLS et une restriction réseau adaptée.
+
+Les commandes suivantes installent ou vérifient la réplication locale. `Install` est l'action par défaut et fait également partie des scripts de déploiement existants qui appellent `database.ps1`. La première installation redémarre le primaire pour charger sa configuration, ce qui peut interrompre brièvement les accès applicatifs.
+
+```powershell
+.\scripts\database.ps1 -Namespace dev
+.\scripts\database.ps1 -Namespace test
+.\scripts\database.ps1 -Namespace dev -Action Check
+.\scripts\database.ps1 -Namespace test -Action Check
+```
+
+Le contrôle confirme le streaming, le mode lecture seule du réplica et le rejeu d'une position WAL relevée sur le primaire. Pour exercer la reprise, le script suivant crée un schéma de vérification isolé, confirme sa réplication et le refus d'une écriture sur le réplica, arrête le réplica, écrit sur le primaire, puis relance le réplica et vérifie son rattrapage. Le schéma de vérification est supprimé à la fin.
+
+```powershell
+.\scripts\test-database-replication.ps1 -Namespace dev
+.\scripts\test-database-replication.ps1 -Namespace test
+```
+
+La réplication est asynchrone. Un incident du primaire peut perdre les dernières transactions encore en transit. Le basculement automatique et le routage des lectures applicatives vers le réplica restent à implémenter. Le primaire est relancé par Kubernetes après une panne de Pod, sur son volume existant.
+
+Le slot physique `photo_standby` conserve les WAL nécessaires au réplica, avec `max_slot_wal_keep_size=256MB` et `wal_keep_size=64MB`. Lorsqu'un réplica reste déconnecté assez longtemps pour dépasser la rétention, son slot peut devenir invalide. Consulter les journaux et `pg_replication_slots` avant de reconstruire la copie depuis un nouveau `pg_basebackup`. La rétention est une limite appliquée aux checkpoints, avec une occupation totale qui inclut également les autres WAL.
+
+Le [guide de lancement et d'arrêt](Lancement_Arrêt.md) inclut désormais les deux réplicas. Les [sauvegardes et restaurations](application.md#sauvegarde-et-restauration-locale) restent nécessaires pour récupérer des données supprimées accidentellement. Cette configuration est installée localement, avec une préparation du cluster école encore à réaliser.
+
+Les mécanismes sont décrits dans les documentations officielles de PostgreSQL. [Streaming replication](https://www.postgresql.org/docs/17/warm-standby.html), [pg_basebackup](https://www.postgresql.org/docs/17/app-pgbasebackup.html).
 
 ## Pipeline GitHub et milestone 2
 
@@ -183,4 +215,4 @@ kubectl --context docker-desktop logs -n kube-system deployment/metrics-server -
 
 ## Travaux finaux restants
 
-Réplication et sharding PostgreSQL, cache répliqué, rafraîchissement de la base Test, déploiement Test distant automatisé et validation avant Production, mesure continue du rollout, sauvegardes testées et finalisation de la documentation en ligne. Un namespace Prod ou un PVC ne prouve pas à lui seul ces fonctionnalités.
+Sharding PostgreSQL, réplication à l'école et basculement, cache répliqué, rafraîchissement de la base Test, déploiement Test distant automatisé et validation avant Production, mesure continue du rollout et finalisation de la documentation en ligne. Les sauvegardes et la réplication locale disposent de procédures de vérification.

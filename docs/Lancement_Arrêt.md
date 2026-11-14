@@ -17,6 +17,10 @@ kubectl --context docker-desktop -n dev scale statefulset/photo-db --replicas=1
 kubectl --context docker-desktop -n test scale statefulset/photo-db --replicas=1
 kubectl --context docker-desktop -n dev rollout status statefulset/photo-db --timeout=240s
 kubectl --context docker-desktop -n test rollout status statefulset/photo-db --timeout=240s
+kubectl --context docker-desktop -n dev scale statefulset/photo-db-replica --replicas=1
+kubectl --context docker-desktop -n test scale statefulset/photo-db-replica --replicas=1
+kubectl --context docker-desktop -n dev rollout status statefulset/photo-db-replica --timeout=240s
+kubectl --context docker-desktop -n test rollout status statefulset/photo-db-replica --timeout=240s
 
 # 3. Relancer le contrôleur Ingress
 kubectl --context docker-desktop -n photo-ingress scale deployment/traefik --replicas=1
@@ -75,7 +79,11 @@ kubectl --context docker-desktop -n test scale deployment/photo-service --replic
 kubectl --context docker-desktop -n dev wait --for=delete pod -l app=photo-service --timeout=180s
 kubectl --context docker-desktop -n test wait --for=delete pod -l app=photo-service --timeout=180s
 
-# 3. Arrêter les bases
+# 3. Arrêter les réplicas puis les bases primaires
+kubectl --context docker-desktop -n dev scale statefulset/photo-db-replica --replicas=0
+kubectl --context docker-desktop -n test scale statefulset/photo-db-replica --replicas=0
+kubectl --context docker-desktop -n dev wait --for=delete pod -l app=photo-db-replica --timeout=180s
+kubectl --context docker-desktop -n test wait --for=delete pod -l app=photo-db-replica --timeout=180s
 kubectl --context docker-desktop -n dev scale statefulset/photo-db --replicas=0
 kubectl --context docker-desktop -n test scale statefulset/photo-db --replicas=0
 

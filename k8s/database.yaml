@@ -31,6 +31,13 @@ spec:
       containers:
         - name: postgres
           image: postgres:17.6-alpine
+          args:
+            - -c
+            - wal_level=replica
+            - -c
+            - max_slot_wal_keep_size=256MB
+            - -c
+            - wal_keep_size=64MB
           ports:
             - name: postgres
               containerPort: 5432
@@ -49,6 +56,12 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            - name: scripts
+              mountPath: /opt/replication
+              readOnly: true
+            - name: replication
+              mountPath: /run/replication
+              readOnly: true
           resources:
             requests:
               cpu: 100m
@@ -77,6 +90,14 @@ spec:
             timeoutSeconds: 5
             periodSeconds: 10
             failureThreshold: 6
+      volumes:
+        - name: scripts
+          configMap:
+            name: photo-db-replication
+        - name: replication
+          secret:
+            secretName: photo-db-replication
+            defaultMode: 0444
   volumeClaimTemplates:
     - metadata:
         name: data

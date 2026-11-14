@@ -11,6 +11,7 @@ node_modules/
 actions-runner/
 _work/
 coverage/
+/backups/
 # School access files may contain private keys; only the route template is public configuration.
 /school_cluster/*
 !/school_cluster/gateway_template.yaml
