@@ -16,7 +16,7 @@ try {
     Invoke-Checked docker @('--context', 'desktop-linux', 'info', '--format', '{{.OSType}}')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'get', 'nodes', '--request-timeout=15s')
     if (-not $SkipBuild) {
-        Invoke-Checked docker @('--context', 'desktop-linux', 'build', '-t', 'photo-service:v2.4.0', '.')
+        Invoke-Checked docker @('--context', 'desktop-linux', 'build', '-t', 'photo-service:v2.4.1', '.')
     }
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'apply', '-f', 'k8s/00-namespace.yaml')
     & .\scripts\database.ps1 -Namespace dev

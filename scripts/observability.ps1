@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Install', 'Check', 'Load')][string]$Action = 'Check',
-    [ValidatePattern('^photo-service:[a-zA-Z0-9_.-]+$')][string]$Image = 'photo-service:v2.4.0',
+    [ValidatePattern('^photo-service:[a-zA-Z0-9_.-]+$')][string]$Image = 'photo-service:v2.4.1',
     [switch]$SkipBuild,
     [ValidateRange(1, 3600)][int]$DurationSeconds = 60,
     [ValidateRange(1, 100)][int]$RequestsPerSecond = 6

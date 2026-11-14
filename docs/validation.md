@@ -385,3 +385,9 @@ Les sauvegardes Production et Test préalable ont chacune été restaurées et v
 Le moteur de bascule a aussi été exercé sur deux bases temporaires isolées. La nouvelle valeur a été lue après remplacement, puis l'ancienne après récupération. Une seconde récupération a réussi. Les bases temporaires du test ont été supprimées. Ce test ne simule pas toutes les interruptions possibles pendant une bascule.
 
 Les archives, leurs rapports et le journal `refresh-483e857e9b2b4cedaa09e5ad6f35d1d2.json` restent dans `backups/`, ignoré par Git. Aucun secret ni contenu photographique n'est ajouté à la documentation. La syntaxe PowerShell est vérifiée. La procédure concerne le cluster local et n'a pas été déployée à l'école.
+
+## Préparation de la version 2.4.1 — 14 novembre 2026
+
+La migration additive `005-auth-expiry-indexes.sql` ajoute les index d'expiration des sessions et tentatives. Les 36 tests passent avec PostgreSQL et Redis temporaires isolés, sans test ignoré. Le test d'intégration vérifie la présence des deux index après des migrations concurrentes et la conservation d'une photo créée avant les migrations. Les parcours d'authentification, de bibliothèque et de sharding passent également.
+
+Les conteneurs temporaires ont été supprimés après vérification. Production possède toujours les migrations 001 à 004 au relevé précédant le déploiement. La version 2.4.1 est préparée dans le dossier de travail et n'est pas encore publiée ou déployée. La démonstration guidée figure dans le guide infrastructure. Une création d'index est bien une évolution de schéma, avec un effet sur le nettoyage des données d'authentification expirées.

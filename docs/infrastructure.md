@@ -354,3 +354,35 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-refresh-d
 ```
 
 Cette procédure cible uniquement `docker-desktop`, namespace `test`. Elle nécessite de l'espace pour les copies temporaires et les archives. Ne pas interrompre volontairement sa phase de bascule.
+
+## Démonstration finale avec migration 005
+
+La version 2.4.1 prépare `005-auth-expiry-indexes.sql`. Elle ajoute deux index sur `expires_at` dans `auth_sessions` et `auth_attempts`. Ces colonnes sont utilisées pour supprimer les sessions et tentatives expirées. Aucun champ ni aucune donnée existante ne sont supprimés. Les anciennes instances peuvent continuer à lire et écrire pendant la mise à jour. La création ordinaire des index peut bloquer brièvement les écritures sur ces tables et doit rester adaptée au petit volume de démonstration. Une grosse base demanderait une stratégie de création concurrente hors de la transaction actuelle des migrations.
+
+Avant la soutenance, conserver une version antérieure sans la migration 005 pour rendre le changement observable. Une migration déjà appliquée ne sera pas rejouée avec le même nom. Ne pas supprimer une ligne de `schema_migrations` pour la forcer. Préparer une nouvelle migration additive si l'exercice a déjà été réalisé.
+
+1. Montrer l'application Production, sa version et les migrations présentes avec les commandes ci-dessous.
+2. Pousser la version préparée sur `main` et ouvrir le run GitHub. Montrer les tests, la construction et le déploiement Test.
+3. Vérifier `/api/info`, la connexion et les photos sur Test. Montrer la migration 005 sur les deux shards Test.
+4. Lancer **Promote validated Test to Production** avec l'identifiant du run Test réussi.
+5. Montrer le succès du workflow, télécharger son artefact `production-evidence` et ouvrir le rapport de continuité HTTP. Expliquer le nombre de requêtes, les erreurs, les révisions observées et la durée. Zéro erreur dans cet échantillonnage démontre la continuité mesurée pendant ce rollout.
+6. Vérifier la version et la migration sur Production, ses trois Pods prêts et la présence des photos initiales. Montrer Grafana puis le scaling depuis Headlamp et revenir à trois répliques.
+
+Commandes de lecture avant et après le déploiement
+
+```powershell
+curl.exe --noproxy '*' --fail --silent -H 'Host: prod.localhost' http://127.0.0.1/api/info
+curl.exe --noproxy '*' --fail --silent -H 'Host: prod.localhost' http://127.0.0.1/api/stats
+
+# Remplacer prod par test pour vérifier l'environnement Test.
+foreach ($pod in @('photo-db-0','photo-db-shard-1-0')) {
+    Write-Host $pod
+    kubectl --context docker-desktop -n prod exec $pod -- psql -X -U photo -d photo_service -c 'SELECT version,applied_at FROM schema_migrations ORDER BY version;'
+    kubectl --context docker-desktop -n prod exec $pod -- psql -X -U photo -d photo_service -c "SELECT indexname,indexdef FROM pg_indexes WHERE schemaname='public' AND indexname IN ('auth_sessions_expires_at_idx','auth_attempts_expires_at_idx');"
+}
+kubectl --context docker-desktop -n prod get pods -l app=photo-service
+```
+
+Les migrations sont exécutées par l'image déployée au démarrage, sous verrou PostgreSQL. Elles s'appliquent au shard distant puis au coordinateur. La réplication physique transporte ensuite ces changements vers les standbys. Le workflow attend la readiness des nouvelles instances avant de terminer.
+
+Pour l'oral, distinguer les preuves locales du déploiement école. Les contraintes du namespace `team5` et la transposition de la nouvelle architecture sont décrites dans le guide école. Le site distant ne reçoit pas automatiquement la promotion Production locale.
