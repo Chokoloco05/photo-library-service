@@ -10,6 +10,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/release-lock.ps1"
+$deploymentLock = $null
 function Invoke-Checked {
     param([string]$Program, [string[]]$Arguments)
     & $Program @Arguments
@@ -18,6 +20,7 @@ function Invoke-Checked {
 
 Push-Location (Split-Path $PSScriptRoot -Parent)
 try {
+    $deploymentLock = Enter-PhotoReleaseLock
     Invoke-Checked docker @('--context', 'desktop-linux', 'image', 'inspect', $Image, '--format', '{{.Id}}')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'get', 'ingressclass', 'traefik', '--request-timeout=15s')
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'rollout', 'status', 'deployment/traefik', '-n', 'photo-ingress', '--timeout=60s')
@@ -81,5 +84,6 @@ try {
     $responses | Select-Object version, revision, environment, pod | Format-Table
     Invoke-Checked kubectl @('--context', 'docker-desktop', 'get', 'deployment,pods,ingress', '-n', 'test', '-o', 'wide')
 } finally {
+    if ($deploymentLock) { $deploymentLock.Dispose() }
     Pop-Location
 }

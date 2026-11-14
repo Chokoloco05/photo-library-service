@@ -375,3 +375,13 @@ Cette validation concerne la restauration locale sur le serveur PostgreSQL exist
 - Le monitoring reste local et la version école publiée reste 2.1.0. Les changements 2.2.0 sont préparés dans le dossier de travail.
 
 [Capture du dashboard et de ses courbes](evidence/grafana-clair.png).
+
+## Rafraîchissement Production vers Test — 14 novembre 2026
+
+La commande `scripts/refresh-test.ps1` a terminé avec succès sur Docker Desktop. Test, initialement vide, contient maintenant la photo de Production et 351 472 octets d'originaux. Les empreintes SQL des photos préparées et activées correspondent. Les quatre migrations sont présentes et les sessions et tentatives copiées sont vides.
+
+Les sauvegardes Production et Test préalable ont chacune été restaurées et vérifiées avant la bascule. Les deux shards Test et leurs réplicas sont prêts, avec des connexions `streaming`, mode `async` et zéro octet de retard lors du contrôle. La photo copiée appartient au shard 0. Les trois Pods Test sont prêts et les API Test et Production retournent le même compteur. Production reste à une photo après l'opération.
+
+Le moteur de bascule a aussi été exercé sur deux bases temporaires isolées. La nouvelle valeur a été lue après remplacement, puis l'ancienne après récupération. Une seconde récupération a réussi. Les bases temporaires du test ont été supprimées. Ce test ne simule pas toutes les interruptions possibles pendant une bascule.
+
+Les archives, leurs rapports et le journal `refresh-483e857e9b2b4cedaa09e5ad6f35d1d2.json` restent dans `backups/`, ignoré par Git. Aucun secret ni contenu photographique n'est ajouté à la documentation. La syntaxe PowerShell est vérifiée. La procédure concerne le cluster local et n'a pas été déployée à l'école.

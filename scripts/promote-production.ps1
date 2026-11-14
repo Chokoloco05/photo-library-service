@@ -6,6 +6,7 @@ param(
     [string]$EvidenceDirectory = '.npm-cache/production'
 )
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/release-lock.ps1"
 $previousEncoding = $OutputEncoding
 $OutputEncoding = [Text.UTF8Encoding]::new($false)
 $promotionLock = $null
@@ -28,7 +29,7 @@ try {
         $release.revision -notmatch '^([a-f0-9]{40}|local-\d{14})$') { throw 'Invalid tested release manifest.' }
     if (($ExpectedRunId -and "$($release.testRunId)" -ne $ExpectedRunId) -or
         ($ExpectedCommit -and $release.revision -ne $ExpectedCommit)) { throw 'Release does not match the selected successful GitHub run.' }
-    $promotionLock = [IO.File]::Open((Join-Path ([IO.Path]::GetTempPath()) 'photo-service-production.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
+    $promotionLock = Enter-PhotoReleaseLock
     $imageId = & docker --context desktop-linux image inspect $release.image --format '{{.Id}}'
     if ($LASTEXITCODE -ne 0 -or "$imageId".Trim() -ne $release.imageId) { throw 'The tested image is missing or its tag has changed. Run the Test pipeline again.' }
     $rawLabels = & docker --context desktop-linux image inspect $release.image --format '{{json .Config.Labels}}'

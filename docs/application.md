@@ -181,7 +181,7 @@ Pour vérifier de nouveau une archive existante, renseigner le chemin affiché l
 
 Les archives et comptes rendus `*.verified.json` sont conservés dans `backups/`, exclu de Git. Le compte rendu contient l'empreinte SHA-256 de l'archive et les compteurs restaurés. Une sauvegarde contient les photos et les tables de sessions administrateur. Elle doit être conservée dans un emplacement privé. Copier les archives validées sur un stockage distinct du PC pour disposer d'une copie en cas de panne locale.
 
-Cette procédure cible PostgreSQL local dans les namespaces Dev et Test. La vérification crée une base isolée sur le même serveur PostgreSQL et consomme temporairement de l'espace supplémentaire. La restauration inclut le schéma et les données de la base applicative. Les rôles PostgreSQL et les Secrets Kubernetes sont configurés séparément. Le rafraîchissement de Test depuis Production reste à implémenter.
+Cette procédure cible PostgreSQL local dans les namespaces Dev et Test. La vérification crée une base isolée sur le même serveur PostgreSQL et consomme temporairement de l'espace supplémentaire. La restauration inclut le schéma et les données de la base applicative. Les rôles PostgreSQL et les Secrets Kubernetes sont configurés séparément. Le [rafraîchissement de Test depuis Production](infrastructure.md#rafraîchir-test-depuis-production-locale) dispose d'une procédure dédiée avec sauvegardes, purge des sessions et retour arrière.
 
 Références officielles de la procédure de sauvegarde et de restauration. [pg_dump](https://www.postgresql.org/docs/17/app-pgdump.html), [pg_restore](https://www.postgresql.org/docs/17/app-pgrestore.html).
 

@@ -323,4 +323,34 @@ kubectl --context docker-desktop logs -n kube-system deployment/metrics-server -
 
 ## Travaux finaux restants
 
-Sharding, réplication, cache et pipeline complet à l'école, basculement, rafraîchissement de la base Test et finalisation de la documentation en ligne. La démonstration finale doit réunir un push GitHub, la validation humaine, la promotion et une évolution réelle du schéma. Les procédures locales couvrent les sauvegardes, la réplication, le sharding, le cache et la mesure du rollout Production.
+Sharding, réplication, cache et pipeline complet à l'école, basculement automatique et finalisation de la documentation en ligne. La démonstration finale doit réunir un push GitHub, la validation humaine, la promotion et une évolution réelle du schéma. Les procédures locales couvrent les sauvegardes, la réplication, le sharding, le cache, le rafraîchissement Test et la mesure du rollout Production.
+
+## Rafraîchir Test depuis Production locale
+
+Depuis la racine du projet, avec Kubernetes et les applications démarrés
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\refresh-test.ps1
+```
+
+Le script sauvegarde Production et vérifie son archive par restauration. Il prépare deux bases temporaires dans Test, reconstruit le sharding et applique les migrations de l'image Test déjà déployée. Il vide les sessions et les tentatives de connexion copiées. Le compte admin reste celui configuré dans le Secret Test.
+
+Test est ensuite arrêté pour sauvegarder son état final et remplacer ses deux bases. Production continue de servir ses utilisateurs. Le nombre de répliques Test initial est rétabli après les contrôles SQL, de réplication et HTTP. Un nouveau jeton de révision invalide les anciennes entrées du cache. Les scripts de déploiement Test, de promotion Production et de rafraîchissement partagent un verrou local.
+
+Les sauvegardes et le journal sont conservés dans `backups/`, ignoré par Git. Ils contiennent des données privées. L'ancienne base Test reste disponible pendant la validation et est supprimée après réussite. Une erreur pendant la bascule déclenche un retour arrière. Après une interruption brutale, utiliser le chemin du journal affiché par le script
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\refresh-test.ps1 -Action Recover -StateFile .\backups\refresh-IDENTIFIANT.json
+```
+
+La récupération par journal concerne une bascule inachevée. Après réussite complète, une restauration ultérieure nécessite la sauvegarde Test préalable.
+
+L'option `-AnonymizeMetadata` remplace noms de fichiers et titres par des identifiants et vide les descriptions. Les pixels et les éventuelles métadonnées intégrées aux images sont conservés. Cette option ne constitue donc pas une anonymisation complète. Employer des photos de démonstration pour l'évaluation.
+
+Le test reproductible suivant crée uniquement des bases temporaires sur les deux primaires Test, vérifie la bascule puis deux récupérations successives et supprime ses bases
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-refresh-database.ps1
+```
+
+Cette procédure cible uniquement `docker-desktop`, namespace `test`. Elle nécessite de l'espace pour les copies temporaires et les archives. Ne pas interrompre volontairement sa phase de bascule.

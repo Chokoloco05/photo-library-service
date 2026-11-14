@@ -16,12 +16,12 @@ Le [support PDF de code](output/pdf/photo-service-support-etude-code.pdf) est ac
 
 Un compte administrateur unique, commun aux environnements, protège désormais les mutations de la version 2.1.0 publiée et déployée : consulter le [guide de configuration](docs/application.md#compte-administrateur-commun). Le PDF du 6 novembre précède cette évolution. Les trois applications école sont de nouveau en service. Le mode HTTP de démonstration est activé ; les échanges ne sont pas chiffrés.
 
-## État vérifié au 10 novembre 2026
+## État vérifié au 14 novembre 2026
 
 - Les trois milestones disposent de preuves locales : application répliquée via Traefik, pipeline Test et scaling depuis Headlamp.
-- Le [dernier pipeline GitHub](https://github.com/Chokoloco05/photo-library-service/actions/runs/42828170689) est réussi : tests, build/rollout Test local et publication privée GHCR.
+- Le [pipeline GitHub vérifié](https://github.com/Chokoloco05/photo-library-service/actions/runs/43555437663) est réussi. La promotion manuelle vers Production locale est également validée sur GitHub.
 - À l’école, Dev/Test/Production sont accessibles dans `team5` : neuf Pods applicatifs prêts et trois bases indépendantes. Les pages et API répondent HTTP 200 ; les écritures anonymes sont refusées avec HTTP 401.
-- Restent notamment la réplication et le sharding PostgreSQL, le cache répliqué, le rafraîchissement de Test, la promotion Production, la preuve sans interruption et le transfert complet du pipeline et du dashboard vers l’école.
+- Localement, les trois environnements disposent de PostgreSQL shardé et répliqué, de Redis répliqué et de supervision. La promotion Production avec mesure du rollout et le [rafraîchissement Production vers Test](docs/infrastructure.md#rafraîchir-test-depuis-production-locale) sont vérifiés. Restent la démonstration finale avec une nouvelle migration, la finalisation documentaire et le transfert complet de cette architecture vers l'école.
 
 ## Accès école
 
