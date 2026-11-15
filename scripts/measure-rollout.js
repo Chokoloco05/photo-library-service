@@ -38,7 +38,7 @@ async function measureRollout({ manifest, evidence, expectedRevision, command = 
   const revisions = new Set();
   let lastInfo;
   async function sample() {
-    for (const pathname of ['/api/info', '/api/stats']) {
+    for (const pathname of ['/api/info', '/readyz']) {
       const before = Date.now();
       result.requests++;
       try {
@@ -48,7 +48,7 @@ async function measureRollout({ manifest, evidence, expectedRevision, command = 
           if (response.payload.environment !== 'prod' || typeof response.payload.revision !== 'string') throw new Error('Invalid Production identity');
           lastInfo = response.payload;
           revisions.add(lastInfo.revision);
-        } else if (!Number.isInteger(response.payload.count)) throw new Error('Invalid library response');
+        } else if (response.payload.status !== 'ok') throw new Error('Database readiness failed');
       } catch (error) {
         result.errors++;
         if (result.failures.length < 20) result.failures.push({ path: pathname, message: error.message });

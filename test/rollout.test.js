@@ -12,7 +12,7 @@ for (const outage of [false, true]) {
     let interrupt = false;
     try {
       const request = async pathname => ({ statusCode: interrupt ? 503 : 200,
-        payload: pathname === '/api/info' ? { environment: 'prod', revision } : { count: 0 } });
+        payload: pathname === '/api/info' ? { environment: 'prod', revision } : { status: 'ok' } });
       const command = async args => {
         if (args[0] === 'apply') {
           interrupt = outage;
@@ -38,7 +38,7 @@ test('rollout preserves failure evidence when the Kubernetes operation fails', a
   try {
     const evidence = path.join(directory, 'evidence.json');
     await assert.rejects(measureRollout({ manifest: 'fixture.json', evidence, expectedRevision: 'new', intervalMs: 1,
-      request: async pathname => ({ statusCode: 200, payload: pathname === '/api/info' ? { environment: 'prod', revision: 'old' } : { count: 0 } }),
+      request: async pathname => ({ statusCode: 200, payload: pathname === '/api/info' ? { environment: 'prod', revision: 'old' } : { status: 'ok' } }),
       command: async () => { throw new Error('apply failed'); },
     }), /apply failed/);
     assert.equal(JSON.parse(await readFile(evidence, 'utf8')).passed, false);

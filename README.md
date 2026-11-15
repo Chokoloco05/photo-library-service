@@ -33,6 +33,8 @@ Consultation publique ; connexion avec le compte `admin` commun pour modifier la
 
 ## Accès locaux
 
+La version 2.5.0 ajoute une page de connexion dédiée avant le dashboard. Le même compte admin protège désormais aussi la consultation et les téléchargements. Cette évolution concerne Dev local ; les autres environnements conservent leur version jusqu'au prochain déploiement.
+
 Avec Docker Desktop et Kubernetes démarrés, suivre le [lancement](docs/application.md#lancement-et-arret).
 
 - Dev : http://localhost/

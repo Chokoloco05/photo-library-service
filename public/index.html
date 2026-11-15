@@ -21,8 +21,7 @@
       <div class="intro-actions"><button id="import-button" hidden class="button primary"><span aria-hidden="true">＋</span> Ajouter des photos</button><p>JPEG, PNG ou WebP · 10 Mo par photo</p></div>
     </section>
     <section class="access-bar" aria-label="Accès à la bibliothèque">
-      <div><strong id="access-title">Consultation publique</strong><p id="access-description">Connectez-vous pour ajouter, modifier ou supprimer des photos.</p></div>
-      <button id="login-button" class="button">Se connecter</button>
+      <div><strong id="access-title">Session administrateur</strong><p id="access-description">Votre photothèque est accessible après connexion.</p></div>
       <button id="logout-button" class="button" hidden>Se déconnecter</button>
     </section>
     <section class="stats" aria-label="Résumé de la bibliothèque">
@@ -50,13 +49,5 @@
   </main>
   <dialog id="compare-dialog" aria-labelledby="compare-title"><div class="dialog-header"><div><p class="eyebrow">PRENDRE LE TEMPS DE CHOISIR</p><h2 id="compare-title">Comparer les photos</h2></div><button class="close-button" data-close="compare-dialog" aria-label="Fermer la comparaison">✕</button></div><p class="dialog-note">Comparez le cadrage, la résolution et le poids. Aucune photo n’est supprimée automatiquement.</p><div id="compare-content" class="compare-grid"></div></dialog>
   <dialog id="edit-dialog" aria-labelledby="edit-title"><form id="edit-form"><div class="dialog-header"><h2 id="edit-title">Les détails du souvenir</h2><button type="button" class="close-button" data-close="edit-dialog" aria-label="Fermer les détails">✕</button></div><label>Titre<input id="photo-title" name="title" required maxlength="200"></label><label>Description<textarea id="photo-description" name="description" maxlength="1000" rows="4" placeholder="Un lieu, une date, une histoire…"></textarea></label><p id="edit-error" class="error" role="alert"></p><button type="submit" class="button primary">Enregistrer les détails</button></form></dialog>
-  <dialog id="login-dialog" aria-labelledby="login-title"><form id="login-form">
-    <div class="dialog-header"><div><p class="eyebrow">ESPACE ADMINISTRATEUR</p><h2 id="login-title">Gérer la photothèque</h2></div><button type="button" class="close-button" data-close="login-dialog" aria-label="Fermer la connexion">✕</button></div>
-    <p class="dialog-note">Connectez-vous au compte admin pour ajouter, modifier ou supprimer des photos.</p>
-    <p id="login-transport-note" class="dialog-note" hidden>Démonstration en HTTP : utilisez un mot de passe réservé à ce projet.</p>
-    <label>Identifiant<input id="login-username" name="username" autocomplete="username" required maxlength="64" value="admin" readonly></label>
-    <label>Mot de passe<input id="login-password" name="password" type="password" autocomplete="current-password" required maxlength="256"></label>
-    <p id="login-error" class="error" role="alert"></p><button type="submit" class="button primary">Se connecter</button>
-  </form></dialog>
 </body>
 </html>

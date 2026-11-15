@@ -20,7 +20,7 @@ test('internal metrics preserve public routes, normalize photo IDs and track dat
   try {
     assert.equal((await fetch(`${publicUrl}/metrics`)).status, 404);
     const ids = [randomUUID(), randomUUID()];
-    for (const id of ids) assert.equal((await fetch(`${publicUrl}/api/photos/${id}/image`)).status, 404);
+    for (const id of ids) assert.equal((await fetch(`${publicUrl}/api/photos/${id}/image`)).status, 401);
     assert.equal((await fetch(`${publicUrl}/unknown-user-path?password=never-a-label`)).status, 404);
     const response = await fetch(internalUrl);
     assert.equal(response.status, 200);

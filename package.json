@@ -1,11 +1,11 @@
 {
   "name": "photo-service",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "private": true,
   "description": "Photo Library Service - Kubernetes deployment pipeline",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check app.js && node --check auth.js && node --check metrics.js && node --check cache.js && node --check server.js && node --check database.js && node --check photos.js && node --check migrate.js && node --check public/library.js",
+    "check": "node --check app.js && node --check auth.js && node --check metrics.js && node --check cache.js && node --check server.js && node --check database.js && node --check photos.js && node --check migrate.js && node --check public/library.js && node --check public/login.js",
     "test": "node --test test/*.test.js",
     "migrate": "node migrate.js"
   },

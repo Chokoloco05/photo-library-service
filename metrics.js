@@ -2,12 +2,12 @@ const http = require('node:http');
 const { Registry, Counter, Gauge, Histogram, collectDefaultMetrics } = require('@prometheus-io/client');
 
 const routes = new Set([
-  '/', '/index.html', '/api/info', '/whoami', '/healthz', '/readyz',
+  '/', '/index.html', '/login', '/login.html', '/dashboard', '/api/info', '/whoami', '/healthz', '/readyz',
   '/api/auth/session', '/api/auth/login', '/api/auth/logout',
   '/api/photos', '/api/photos/:id', '/api/photos/:id/image', '/api/photos/:id/download',
   '/api/stats', '/api/duplicates', '/api/similar',
 ]);
-const assets = new Set(['/style.css', '/library.js', '/favicon.ico']);
+const assets = new Set(['/style.css', '/library.js', '/login.js', '/favicon.ico']);
 
 function routeLabel(path) {
   const normalized = path.replace(/^\/api\/photos\/[^/]+/, '/api/photos/:id');

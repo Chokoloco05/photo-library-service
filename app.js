@@ -20,6 +20,8 @@ function createApp(options = {}) {
   const auth = createAuth({ database, basePath, env: options.env || process.env, config: options.auth });
   const html = readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8')
     .replace('<base href="/">', `<base href="${basePath}/">`);
+  const loginHtml = readFileSync(path.join(__dirname, 'public', 'login.html'), 'utf8')
+    .replace('<base href="/">', `<base href="${basePath}/">`);
   let uploads = 0;
 
   app.disable('x-powered-by');
@@ -44,11 +46,18 @@ function createApp(options = {}) {
   });
   app.get('/api/info', (_req, res) => res.json(identity));
   // Preserve the JSON identity used by the first two milestones' curl checks.
-  app.get('/', (req, res) => {
+  app.get('/', async (req, res) => {
     if (!req.accepts('html') || !String(req.get('accept') || '').includes('text/html')) return res.json({ ...identity, photos: [] });
+    res.redirect(`${basePath}/${await auth.session(req) ? 'dashboard' : 'login'}`);
+  });
+  app.get(['/login', '/login.html'], async (req, res) => {
+    if (await auth.session(req)) return res.redirect(`${basePath}/dashboard`);
+    res.type('html').send(loginHtml);
+  });
+  app.get(['/dashboard', '/index.html'], async (req, res) => {
+    if (!await auth.session(req)) return res.redirect(`${basePath}/login`);
     res.type('html').send(html);
   });
-  app.get('/index.html', (_req, res) => res.type('html').send(html));
   app.use(express.static(path.join(__dirname, 'public'), { index: false }));
   app.get('/whoami', (_req, res) => res.type('text/plain').send(`${identity.pod}\n`));
   app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));
@@ -67,6 +76,7 @@ function createApp(options = {}) {
   app.get('/api/auth/session', auth.status);
   app.post('/api/auth/login', auth.sameOrigin, express.json({ limit: '2kb' }), auth.login);
   app.post('/api/auth/logout', auth.requireWrite, auth.logout);
+  app.use('/api', auth.requireRead);
   // All library mutations are protected before parsing upload bodies or invoking SQL.
   app.use('/api', (req, res, next) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method)
     ? next() : auth.requireWrite(req, res, next));

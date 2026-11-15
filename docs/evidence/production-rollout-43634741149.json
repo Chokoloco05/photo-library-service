@@ -1,0 +1,14 @@
+{
+  "startedAtUtc": "2026-11-14T19:57:43.292Z",
+  "expectedRevision": "6601979e147af0d506dbceb81ae99d636a5bf95e",
+  "requests": 396,
+  "errors": 0,
+  "maxLatencyMs": 967,
+  "observedRevisions": [
+    "da6cfbedd867a79063e18fcd0277778a2fcbfff5",
+    "6601979e147af0d506dbceb81ae99d636a5bf95e"
+  ],
+  "failures": [],
+  "durationSeconds": 54.399,
+  "passed": true
+}

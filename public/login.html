@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173f36">
+  <base href="/">
+  <title>Connexion — Clair</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="login.js" defer></script>
+</head>
+<body class="login-page">
+  <header class="topbar"><a class="brand" href="./" aria-label="Clair, accueil"><span class="brand-mark" aria-hidden="true">◈</span> clair<span class="brand-dot">.</span></a><span class="top-caption">UNE PLACE POUR VOS SOUVENIRS</span></header>
+  <main class="login-layout">
+    <section class="login-intro"><p class="eyebrow">VOTRE PHOTOTHÈQUE, SIMPLEMENT</p><h1>Vos souvenirs.<br><span>À leur juste place.</span></h1><p class="intro-copy">Retrouvez vos photos, comparez les versions et gardez l’essentiel.</p><div class="login-art" aria-hidden="true"><span>◈</span><span>◌</span><span>▧</span></div></section>
+    <section class="login-panel" aria-labelledby="login-title">
+      <p class="eyebrow">BIENVENUE CHEZ VOUS</p><h2 id="login-title">Se connecter</h2>
+      <p class="dialog-note">Connectez-vous pour accéder à votre photothèque.</p>
+      <form id="login-form">
+        <label>Identifiant<input name="username" autocomplete="username" required maxlength="64" value="admin"></label>
+        <label>Mot de passe<input name="password" type="password" autocomplete="current-password" required maxlength="256"></label>
+        <p id="login-error" class="error" role="alert"></p>
+        <button id="login-submit" type="submit" class="button primary" disabled>Se connecter →</button>
+      </form>
+      <p id="login-status" class="dialog-note" role="status">Vérification du service…</p>
+    </section>
+  </main>
+</body>
+</html>

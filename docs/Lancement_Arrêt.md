@@ -162,7 +162,7 @@ Les chemins concernés répondront HTTP 503 pendant l'arrêt. Pour **déployer u
 
 ## Connexion admin : un seul compte partout
 
-Les photos sont visibles sans connexion. Utiliser **Se connecter**, l'identifiant **`admin`** et le mot de passe choisi en Dev pour importer, modifier ou supprimer. Le compte commun est déjà configuré ; ne pas le recréer après chaque redémarrage.
+Avec la version 2.5.0, l'ouverture du site affiche une page de connexion, puis le dashboard actuel après authentification. Utiliser l'identifiant **`admin`** et le mot de passe déjà choisi. La consultation, l'import, la modification et la suppression exigent cette session. La déconnexion ramène à la page de connexion. Le compte commun est conservé ; ne pas le recréer après chaque redémarrage. Test, Production et l'école gardent leur comportement précédent jusqu'au déploiement de cette nouvelle image.
 
 Pour changer ultérieurement ce mot de passe **une seule fois pour tous les environnements**, utiliser la saisie masquée :
 

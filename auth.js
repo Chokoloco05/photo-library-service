@@ -58,7 +58,7 @@ function createAuth({ database, basePath, env = process.env, config = {} }) {
       csrfToken: current?.csrf_token || null, configured, loginAllowed: configured && transport(req), demoHttp: isDemo(req) });
   }
   async function login(req, res) {
-    if (!configured) return res.status(503).json({ error: 'Compte administrateur non configuré. La bibliothèque reste en lecture seule.' });
+    if (!configured) return res.status(503).json({ error: 'Compte administrateur non configuré. Contactez le responsable du service.' });
     if (!transport(req)) return res.status(426).json({ error: 'Une connexion HTTPS est nécessaire pour se connecter.' });
     const { username: supplied, password } = req.body || {};
     if (typeof supplied !== 'string' || typeof password !== 'string' || supplied.length > 64 || Buffer.byteLength(password) > 256)
@@ -79,6 +79,10 @@ function createAuth({ database, basePath, env = process.env, config = {} }) {
     res.cookie(name, value, { ...cookieOptions(req), maxAge: TTL * 1000 });
     res.json({ authenticated: true, username, csrfToken: csrf, configured: true, loginAllowed: true, demoHttp: isDemo(req) });
   }
+  async function requireRead(req, res, next) {
+    if (!await session(req)) return res.status(401).json({ error: 'Connectez-vous pour accéder à la photothèque.' });
+    next();
+  }
   async function requireWrite(req, res, next) {
     const current = await session(req);
     if (!current) return res.status(401).json({ error: 'Connecte-toi pour ajouter, modifier ou supprimer des photos.' });
@@ -91,6 +95,6 @@ function createAuth({ database, basePath, env = process.env, config = {} }) {
     res.clearCookie(name, cookieOptions(req));
     res.status(204).end();
   }
-  return { status, login, logout, requireWrite, sameOrigin };
+  return { status, login, logout, requireRead, requireWrite, sameOrigin, session };
 }
 module.exports = { createAuth, hashPassword, verifyPassword };

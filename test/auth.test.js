@@ -47,12 +47,12 @@ test('authentication denies insecure remote login, forged origins and excessive 
   } finally { await new Promise(resolve => local.close(resolve)); }
 });
 
-test('missing administrator configuration leaves reads public and denies mutations', async () => {
+test('missing administrator configuration denies library access', async () => {
   const server = createApp({ database: { list: async () => [] }, env: {} }).listen(0, '127.0.0.1');
   await once(server, 'listening');
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    assert.equal((await fetch(`${base}/api/photos`)).status, 200);
+    assert.equal((await fetch(`${base}/api/photos`)).status, 401);
     assert.equal((await fetch(`${base}/api/photos`, { method: 'POST' })).status, 401);
     const session = await (await fetch(`${base}/api/auth/session`)).json();
     assert.equal(session.configured, false);

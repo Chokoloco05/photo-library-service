@@ -109,7 +109,7 @@ try {
         Start-Sleep -Seconds 2
     }
     if ($info.environment -ne 'prod' -or $info.revision -ne $release.revision) { throw 'Production HTTP identity did not converge.' }
-    foreach ($endpoint in @('/api/info', '/readyz', '/api/stats')) {
+    foreach ($endpoint in @('/api/info', '/readyz')) {
         & curl.exe --noproxy '*' --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 2 --max-time 5 -H 'Host: prod.localhost' "http://127.0.0.1$endpoint"
         if ($LASTEXITCODE -ne 0) { throw 'Production HTTP verification failed.' }
     }

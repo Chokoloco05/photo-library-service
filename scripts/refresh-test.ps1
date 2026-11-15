@@ -64,9 +64,7 @@ END $$;
 function Verify-TestHttp {
     $raw = & curl.exe --noproxy '*' --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 --max-time 5 -H 'Host: test.localhost' http://127.0.0.1/readyz
     if ($LASTEXITCODE -ne 0) { throw 'Test application did not become ready.' }
-    $raw = & curl.exe --noproxy '*' --fail --silent --show-error --max-time 5 -H 'Host: test.localhost' http://127.0.0.1/api/stats
-    if ($LASTEXITCODE -ne 0) { throw 'Test library endpoint is unavailable.' }
-    return (($raw -join "`n") | ConvertFrom-Json)
+    return (Read-LibrarySummary photo_service)
 }
 
 Push-Location (Split-Path $PSScriptRoot -Parent)

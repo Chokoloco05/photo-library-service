@@ -179,7 +179,7 @@ Production locale utilise trois Pods applicatifs, deux shards PostgreSQL avec le
 
 La première installation prépare l'infrastructure et le sharding avec une phase d'initialisation. Les promotions suivantes sauvegardent et vérifient la base Production, puis appliquent le RollingUpdate avec `maxUnavailable: 0` et `maxSurge: 1`. Les migrations additives sont exécutées au démarrage des nouveaux Pods, sur les deux shards.
 
-Pendant le rollout applicatif, [measure-rollout.js](../scripts/measure-rollout.js) sonde continuellement `/api/info` et `/api/stats` via l'Ingress. Il conserve le nombre de requêtes, les erreurs, les révisions observées, la durée et la latence maximale. Une erreur HTTP, un échec Kubernetes ou une absence de convergence fait échouer la promotion. Les preuves sont conservées dans un artefact propre au run de promotion. Un échec nécessite un diagnostic avant un éventuel retour arrière compatible avec le schéma.
+Pendant le rollout applicatif, [measure-rollout.js](../scripts/measure-rollout.js) sonde continuellement `/api/info` et `/readyz` via l'Ingress. Il conserve le nombre de requêtes, les erreurs, les révisions observées, la durée et la latence maximale. Une erreur HTTP, un échec Kubernetes ou une absence de convergence fait échouer la promotion. Les preuves sont conservées dans un artefact propre au run de promotion. Un échec nécessite un diagnostic avant un éventuel retour arrière compatible avec le schéma.
 
 Sur ce Docker Desktop de quatre cœurs et environ 4 Gio, les Pods PostgreSQL Production réservent chacun 64 Mio et conservent une limite de 256 Mio. Les réservations Dev/Test restent à 128 Mio. Cette configuration permet la présence des trois environnements et d'un Pod applicatif supplémentaire pendant le rollout.
 

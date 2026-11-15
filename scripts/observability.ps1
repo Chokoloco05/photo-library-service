@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Install', 'Check', 'Load')][string]$Action = 'Check',
-    [ValidatePattern('^photo-service:[a-zA-Z0-9_.-]+$')][string]$Image = 'photo-service:v2.4.1',
+    [ValidatePattern('^photo-service:[a-zA-Z0-9_.-]+$')][string]$Image = 'photo-service:v2.5.0',
     [switch]$SkipBuild,
     [ValidateRange(1, 3600)][int]$DurationSeconds = 60,
     [ValidateRange(1, 100)][int]$RequestsPerSecond = 6
@@ -25,7 +25,7 @@ function Read-Endpoint {
 Push-Location (Split-Path $PSScriptRoot -Parent)
 try {
     if ($Action -eq 'Load') {
-        $urls = @('http://localhost/api/stats', 'http://test.localhost/api/stats')
+        $urls = @('http://localhost/readyz', 'http://test.localhost/readyz')
         $clock = [Diagnostics.Stopwatch]::StartNew()
         $requests = 0; $errors = 0
         while ($clock.Elapsed.TotalSeconds -lt $DurationSeconds) {

@@ -57,6 +57,30 @@ test('PostgreSQL migrations and shared library lifecycle across two application 
     }
     const fetch = (url, options = {}) => global.fetch(url, { ...options,
       headers: { ...sessions.get(url.startsWith(other) ? other : base), ...options.headers } });
+    await t.test('separate login and dashboard protect pages and all library reads including mounted environments', async () => {
+      for (const url of [base, other]) {
+        const prefix = new URL(url).pathname.replace(/\/$/, '');
+        for (const route of ['/', '/dashboard', '/index.html']) {
+          const response = await global.fetch(`${url}${route}`, { headers: { Accept: 'text/html' }, redirect: 'manual' });
+          assert.equal(response.status, 302);
+          assert.equal(response.headers.get('location'), `${prefix}/login`);
+        }
+        const page = await global.fetch(`${url}/login`);
+        assert.equal(page.status, 200);
+        const html = await page.text();
+        assert.match(html, /id="login-form"/);
+        assert.doesNotMatch(html, /id="results"/);
+        for (const route of ['/api/photos','/api/stats','/api/duplicates','/api/similar',
+          '/api/photos/11111111-1111-4111-8111-111111111111/image',
+          '/api/photos/11111111-1111-4111-8111-111111111111/download']) {
+          assert.equal((await global.fetch(`${url}${route}`)).status, 401);
+          assert.equal((await global.fetch(`${url}${route}`, { method: 'HEAD' })).status, 401);
+        }
+        assert.equal((await fetch(`${url}/dashboard`)).status, 200);
+        const loggedIn = await fetch(`${url}/login`, { redirect: 'manual' });
+        assert.equal(loggedIn.headers.get('location'), `${prefix}/dashboard`);
+      }
+    });
     await t.test('blocks anonymous writes, shares sessions across replicas and revokes logout', async () => {
       for (const method of ['POST', 'PATCH', 'DELETE']) {
         const route = method === 'POST' ? '/api/photos' : '/api/photos/11111111-1111-4111-8111-111111111111';

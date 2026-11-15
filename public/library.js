@@ -1,6 +1,7 @@
 /* Shared library: all mutations go to PostgreSQL through the API. */
 const $ = selector => document.querySelector(selector);
 const BASE_PATH = new URL(document.baseURI).pathname.replace(/\/$/, '');
+window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
 const state = { photos: [], view: 'library', selected: new Set(), groups: [], pairs: [], editing: null, importing: false };
 state.auth = { authenticated: false, csrfToken: null, loginAllowed: false };
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -16,30 +17,21 @@ async function api(url, options) {
     const body = await response.json().catch(() => ({}));
     if (response.status === 401 && url !== '/api/auth/login') {
       state.auth = { ...state.auth, authenticated: false, csrfToken: null };
-      updateAccess(); render();
+      location.replace(`${BASE_PATH}/login`);
     }
     throw Object.assign(new Error(body.error || `Le service ne répond pas (${response.status}). Réessaie.`), { status: response.status });
   }
   return response.status === 204 ? null : response.json();
 }
 function updateAccess() {
-  const { authenticated, username, loginAllowed, configured } = state.auth;
-  $('#access-title').textContent = authenticated ? `Connecté : ${username}` : 'Consultation publique';
-  $('#access-description').textContent = authenticated ? 'Vous pouvez ajouter, modifier et supprimer des photos.'
-    : !configured ? 'Gestion non configurée. La bibliothèque est en lecture seule.'
-    : !loginAllowed ? 'La connexion administrateur nécessite HTTPS. La consultation reste disponible.'
-    : 'Connectez-vous pour ajouter, modifier ou supprimer des photos.';
-  $('#login-button').hidden = authenticated;
-  $('#login-button').disabled = !loginAllowed;
+  const { authenticated, username } = state.auth;
+  $('#access-title').textContent = `Connecté : ${username || 'admin'}`;
+  $('#access-description').textContent = 'Vous pouvez ajouter, modifier et supprimer des photos.';
   $('#logout-button').hidden = !authenticated;
-  $('#login-transport-note').hidden = !state.auth.demoHttp;
   $('#import-button').hidden = !authenticated;
   $('#dropzone').hidden = !authenticated;
 }
-function askLogin() {
-  if (!state.auth.loginAllowed) { notify($('#access-description').textContent); return; }
-  $('#login-error').textContent = ''; $('#login-dialog').showModal();
-}
+function askLogin() { location.replace(`${BASE_PATH}/login`); }
 function notify(message, error = false) { const el = $('#notice'); el.textContent = message; el.hidden = !message; el.classList.toggle('error', error); }
 function empty(title, copy, action = '') {
   return `<div class="empty"><span class="empty-icon" aria-hidden="true">◌</span><h2>${escapeHtml(title)}</h2><p>${escapeHtml(copy)}</p>${action}</div>`;
@@ -187,23 +179,14 @@ $('#search').addEventListener('input', render); $('#sort').addEventListener('cha
 $('#clear-selection').addEventListener('click', () => { state.selected.clear(); render(); });
 $('#compare-button').addEventListener('click', () => compare([...state.selected]));
 $('#refresh').addEventListener('click', () => { notify(''); load(); });
-$('#login-button').addEventListener('click', askLogin);
-$('#login-form').addEventListener('submit', async event => {
-  event.preventDefault(); event.submitter.disabled = true;
-  try {
-    state.auth = await api('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: $('#login-username').value, password: $('#login-password').value }) });
-    $('#login-dialog').close(); updateAccess(); await load(); notify('Connexion réussie.');
-  } catch (error) { $('#login-error').textContent = error.message; }
-  finally { $('#login-password').value = ''; event.submitter.disabled = false; }
-});
-$('#login-dialog').addEventListener('close', () => { $('#login-password').value = ''; });
 $('#logout-button').addEventListener('click', async () => {
   try {
     await api('/api/auth/logout', { method: 'POST' });
-    state.auth = await api('/api/auth/session');
-    $('#compare-dialog').close(); $('#edit-dialog').close(); updateAccess(); render(); notify('Déconnexion effectuée.');
+    location.replace(`${BASE_PATH}/login`);
   } catch (error) { notify(error.message, true); }
 });
 api('/api/info').then(info => { $('#environment').textContent = info.environment.toUpperCase(); $('#version').textContent = `${info.version} · ${info.pod}`; }).catch(() => { $('#environment').textContent = 'Hors ligne'; });
-api('/api/auth/session').then(session => { state.auth = session; }).catch(() => {}).finally(() => { updateAccess(); load(); });
+api('/api/auth/session').then(session => {
+  if (!session.authenticated) { location.replace(`${BASE_PATH}/login`); return; }
+  state.auth = session; updateAccess(); load();
+}).catch(() => location.replace(`${BASE_PATH}/login`));

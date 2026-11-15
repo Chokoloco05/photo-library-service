@@ -59,7 +59,6 @@ try {
     }
     Invoke-Checked curl.exe @('--noproxy', '*', '--fail', '--silent', '--show-error', '--max-time', '5', '-H', 'Host: photo-test.local', 'http://127.0.0.1/healthz')
     Invoke-Checked curl.exe @('--noproxy', '*', '--fail', '--silent', '--show-error', '--max-time', '5', '-H', 'Host: photo-test.local', 'http://127.0.0.1/readyz')
-    Invoke-Checked curl.exe @('--noproxy', '*', '--fail', '--silent', '--show-error', '--max-time', '5', '-H', 'Host: photo-test.local', 'http://127.0.0.1/api/stats')
     if ($ReleaseFile) {
         $imageId = & docker --context desktop-linux image inspect $Image --format '{{.Id}}'
         if ($LASTEXITCODE -ne 0) { throw 'Cannot record the tested image.' }

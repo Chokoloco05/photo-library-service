@@ -45,7 +45,7 @@ Chaque environnement possède sa propre base. Les originaux (`bytea`), miniature
 
 Cette première version utilise **un PostgreSQL par environnement**, avec un StatefulSet et un PVC. La réplication et le sharding de la base, ainsi que le cache répliqué, restent à ajouter pour le barème final. Ne pas augmenter simplement les répliques de ce StatefulSet : cela ne configurerait pas de réplication PostgreSQL.
 
-La bibliothèque reste partagée et sa **consultation est publique**, y compris les téléchargements. Depuis l'ajout de l'authentification, un compte administrateur est obligatoire pour importer, modifier ou supprimer ; les contrôles sont appliqués par l'API, avant le traitement des fichiers. Ne pas utiliser cette bibliothèque publique pour des photos privées.
+À partir de la version 2.5.0, la bibliothèque partagée exige une connexion pour la consultation, les images, les téléchargements et les modifications. Le site ouvre une page dédiée `/login`, puis redirige vers le dashboard `/dashboard`. Le compte admin existant est conservé. Les contrôles sont appliqués côté serveur, y compris pour les accès directs aux API. Le mode HTTP de démonstration conserve ses limites de confidentialité du transport.
 
 ## Compte administrateur commun
 
@@ -69,7 +69,7 @@ Le cookie reste `HttpOnly` et `SameSite=Strict`, mais ne porte pas `Secure` en m
 
 Les sessions aléatoires sont hachées en PostgreSQL et expirent après huit heures ; la déconnexion les révoque. Les répliques partagent ces tables sans session collante. Chaque base conserve son budget de dix tentatives par fenêtre de quinze minutes. Un changement de mot de passe invalide les anciennes sessions après remplacement des Pods.
 
-Sans Secret valide, la bibliothèque démarre en lecture seule. La migration `003-auth.sql` ajoute les sessions et la limitation sans modifier les photos existantes. Pour lancer Node directement, fournir `AUTH_ADMIN_USER=admin` et `AUTH_ADMIN_PASSWORD_HASH`, ainsi que `AUTH_ALLOW_LOCAL_HTTP=true` uniquement sur localhost.
+Sans Secret valide, la connexion reste indisponible et les données de la bibliothèque restent protégées. La migration `003-auth.sql` ajoute les sessions et la limitation sans modifier les photos existantes. Pour lancer Node directement, fournir `AUTH_ADMIN_USER=admin` et `AUTH_ADMIN_PASSWORD_HASH`, ainsi que `AUTH_ALLOW_LOCAL_HTTP=true` uniquement sur localhost.
 
 Implémentation : [auth.js](../auth.js), [migration](../migrations/003-auth.sql), [synchronisation du compte](../scripts/configure-auth.ps1). Le PDF du 6 novembre précède cette fonctionnalité. Référence de sécurité : [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
 
@@ -204,6 +204,6 @@ Références officielles de la procédure de sauvegarde et de restauration. [pg_
 | `GET /api/stats` | Compteurs et poids des originaux |
 | `GET /healthz`, `GET /readyz`, `GET /whoami` | Vérifications et identité du Pod |
 
-Le navigateur reçoit l’interface HTML sur `/`. Les anciens appels curl sans en-tête `Accept: text/html` reçoivent encore l’identité JSON ; le pipeline Test utilise explicitement `/api/info`.
+Le navigateur est redirigé depuis `/` vers `/login` ou `/dashboard` selon sa session. `/index.html` est protégé comme le dashboard. Les anciens appels curl sans en-tête `Accept: text/html` reçoivent encore l'identité JSON sans données photographiques. `/api/info`, `/healthz` et `/readyz` restent disponibles pour les sondes. Les lectures de bibliothèque exigent un cookie de session valide, les écritures exigent aussi le jeton CSRF et une origine autorisée. La déconnexion et l'expiration de session renvoient à la page de connexion.
 
 Limites de cette version — 10 Mo par photo, 24 mégapixels, JPEG/PNG/WebP non animés, 2 000 photos par environnement et 100 paires de similitude affichées. Chaque PVC de 2 Gio impose également une capacité réelle de stockage. Le calcul des ressemblances est quadratique et destiné aux petites bibliothèques de démonstration.

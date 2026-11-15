@@ -391,3 +391,23 @@ Les archives, leurs rapports et le journal `refresh-483e857e9b2b4cedaa09e5ad6f35
 La migration additive `005-auth-expiry-indexes.sql` ajoute les index d'expiration des sessions et tentatives. Les 36 tests passent avec PostgreSQL et Redis temporaires isolés, sans test ignoré. Le test d'intégration vérifie la présence des deux index après des migrations concurrentes et la conservation d'une photo créée avant les migrations. Les parcours d'authentification, de bibliothèque et de sharding passent également.
 
 Les conteneurs temporaires ont été supprimés après vérification. Production possède toujours les migrations 001 à 004 au relevé précédant le déploiement. La version 2.4.1 est préparée dans le dossier de travail et n'est pas encore publiée ou déployée. La démonstration guidée figure dans le guide infrastructure. Une création d'index est bien une évolution de schéma, avec un effet sur le nettoyage des données d'authentification expirées.
+
+## Promotion Production 2.4.1 — 14 novembre 2026
+
+Le [pipeline Test 43634047240](https://github.com/Chokoloco05/photo-library-service/actions/runs/43634047240) et la [promotion Production 43634741149](https://github.com/Chokoloco05/photo-library-service/actions/runs/43634741149) ont réussi pour le commit `6601979e147af0d506dbceb81ae99d636a5bf95e`.
+
+Avant promotion, Test servait 2.4.1 avec cinq migrations et Production 2.4.0 avec quatre. Après promotion, Production sert 2.4.1 et le même commit validé en Test. Les deux primaires Production contiennent `005-auth-expiry-indexes.sql` et les index `auth_sessions_expires_at_idx` et `auth_attempts_expires_at_idx`.
+
+Le rapport de continuité mesure 396 requêtes HTTP, zéro erreur, 54,399 secondes et une latence maximale de 967 ms. Il observe les anciennes et nouvelles révisions pendant le rollout. Cette preuve décrit les requêtes échantillonnées pendant ce déploiement local. Les trois Pods Production sont prêts après convergence et la photo initiale est conservée, avec 351 472 octets d'original.
+
+Le rapport JSON est conservé dans l'artefact GitHub `production-evidence-1` et dans [les preuves du dépôt](evidence/production-rollout-43634741149.json). Le déploiement école reste indépendant.
+
+## Connexion séparée et dashboard — 15 novembre 2026
+
+La version 2.5.0 sépare `/login` et `/dashboard`, avec le compte admin et les sessions existants. Les contrôles serveur couvrent la bibliothèque, les statistiques, les doublons, les images et les téléchargements. Les sondes utilisent `/api/info` et `/readyz` et n'ont pas besoin d'une session photographique.
+
+Les tests applicatifs ont validé 36 cas sur 37 au premier passage, puis le test sharding a été adapté pour transmettre sa session au téléchargement désormais privé et a réussi. Le nouveau cas d'intégration vérifie les redirections et les refus GET/HEAD sur les données pour les chemins racine et `/test`.
+
+Chrome a validé le formulaire, l'erreur de mot de passe, l'accès au dashboard, le maintien de session après rechargement, la déconnexion, le refus des accès directs et l'affichage mobile de 390 pixels sans débordement horizontal. Aucun message d'erreur JavaScript n'a été observé. Les vérifications utilisent uniquement des comptes et bases de test isolés. Les changements ne sont pas encore publiés sur GitHub.
+
+L'image locale `photo-service:v2.5.0` a ensuite été construite et déployée uniquement en Dev. Les trois Pods sont prêts. L'ouverture HTML de `/` répond avec une redirection vers `/login` et les API photos, statistiques, doublons et ressemblances refusent les lectures anonymes avec HTTP 401 après convergence. Test, Production et le cluster école n'ont pas été modifiés par cette intervention. Le compte admin existant est conservé.

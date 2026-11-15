@@ -68,7 +68,7 @@ test('hash sharding preserves legacy photos, cross-shard operations, migrations 
       const upload = await fetch(`${base}/api/photos`, { method: 'POST', headers: { ...headers, 'Content-Type': 'image/png', 'X-Filename': 'sharded.png' }, body: photo.original });
       assert.equal(upload.status, 201);
       const uploaded = await upload.json();
-      assert.deepEqual(Buffer.from(await (await fetch(`${base}/api/photos/${uploaded.id}/download`)).arrayBuffer()), photo.original);
+      assert.deepEqual(Buffer.from(await (await fetch(`${base}/api/photos/${uploaded.id}/download`, { headers })).arrayBuffer()), photo.original);
       assert.equal((await fetch(`${base}/readyz`)).status, 200);
       assert.equal((await fetch(`${base}/api/photos/${uploaded.id}`, { method: 'DELETE', headers })).status, 204);
     } finally { await new Promise(resolve => server.close(resolve)); }
