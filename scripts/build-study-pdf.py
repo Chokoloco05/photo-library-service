@@ -427,7 +427,6 @@ for number,item in enumerate(pages,1):
         y=heading('Index des sources et limites',y,23,FOREST)
         y=para(f'{len(sources)} fichiers reproduits intégralement, avec les sources du commit {SHA}. Le générateur du support est une modification locale supplémentaire. Le PDF ne contient aucun accès privé du cluster.',y)
         for title,text in [
-            ('docs/banque-questions-revision.md','88 questions-réponses et présentations orales ; compléter les questions de contrôle du présent support.'),
             ('docs/application.md','Lancement, arrêt, API, limites, PostgreSQL et migrations.'),
             ('docs/infrastructure.md','Trois milestones, pipeline, runner, dashboard et dépannage.'),
             ('docs/ecole.md','Namespace team5, image privée, déploiement et blocage DNS.'),

@@ -1,0 +1,190 @@
+{
+  "imageDigest": "sha256:c13007a161d682d4e6f9a97ad2e6358129de24170ae943bd5be17efa2cb40e5a",
+  "verifiedAtUtc": "2026-11-15T02:45:52.8529471Z",
+  "environments": [
+    {
+      "checks": [
+        {
+          "path": "/",
+          "status": 302
+        },
+        {
+          "path": "/login",
+          "status": 200
+        },
+        {
+          "path": "/dashboard",
+          "status": 302
+        },
+        {
+          "path": "/index.html",
+          "status": 302
+        },
+        {
+          "path": "/style.css",
+          "status": 200
+        },
+        {
+          "path": "/login.js",
+          "status": 200
+        },
+        {
+          "path": "/readyz",
+          "status": 200
+        },
+        {
+          "path": "/api/photos",
+          "status": 401
+        },
+        {
+          "path": "/api/stats",
+          "status": 401
+        },
+        {
+          "path": "/api/duplicates",
+          "status": 401
+        },
+        {
+          "path": "/api/similar",
+          "status": 401
+        },
+        {
+          "path": "/api/photos/11111111-1111-4111-8111-111111111111/image",
+          "status": 401
+        },
+        {
+          "path": "/api/photos/11111111-1111-4111-8111-111111111111/download",
+          "status": 401
+        }
+      ],
+      "revision": "99d67778945ea774b2426db569ad64389e1a17a0",
+      "configured": true,
+      "environment": "dev",
+      "loginAllowed": true,
+      "version": "v2.5.0"
+    },
+    {
+      "checks": [
+        {
+          "path": "/",
+          "status": 302
+        },
+        {
+          "path": "/login",
+          "status": 200
+        },
+        {
+          "path": "/dashboard",
+          "status": 302
+        },
+        {
+          "path": "/index.html",
+          "status": 302
+        },
+        {
+          "path": "/style.css",
+          "status": 200
+        },
+        {
+          "path": "/login.js",
+          "status": 200
+        },
+        {
+          "path": "/readyz",
+          "status": 200
+        },
+        {
+          "path": "/api/photos",
+          "status": 401
+        },
+        {
+          "path": "/api/stats",
+          "status": 401
+        },
+        {
+          "path": "/api/duplicates",
+          "status": 401
+        },
+        {
+          "path": "/api/similar",
+          "status": 401
+        },
+        {
+          "path": "/api/photos/11111111-1111-4111-8111-111111111111/image",
+          "status": 401
+        },
+        {
+          "path": "/api/photos/11111111-1111-4111-8111-111111111111/download",
+          "status": 401
+        }
+      ],
+      "revision": "99d67778945ea774b2426db569ad64389e1a17a0",
+      "configured": true,
+      "environment": "test",
+      "loginAllowed": true,
+      "version": "v2.5.0"
+    },
+    {
+      "checks": [
+        {
+          "path": "/",
+          "status": 302
+        },
+        {
+          "path": "/login",
+          "status": 200
+        },
+        {
+          "path": "/dashboard",
+          "status": 302
+        },
+        {
+          "path": "/index.html",
+          "status": 302
+        },
+        {
+          "path": "/style.css",
+          "status": 200
+        },
+        {
+          "path": "/login.js",
+          "status": 200
+        },
+        {
+          "path": "/readyz",
+          "status": 200
+        },
+        {
+          "path": "/api/photos",
+          "status": 401
+        },
+        {
+          "path": "/api/stats",
+          "status": 401
+        },
+        {
+          "path": "/api/duplicates",
+          "status": 401
+        },
+        {
+          "path": "/api/similar",
+          "status": 401
+        },
+        {
+          "path": "/api/photos/11111111-1111-4111-8111-111111111111/image",
+          "status": 401
+        },
+        {
+          "path": "/api/photos/11111111-1111-4111-8111-111111111111/download",
+          "status": 401
+        }
+      ],
+      "revision": "99d67778945ea774b2426db569ad64389e1a17a0",
+      "configured": true,
+      "environment": "prod",
+      "loginAllowed": true,
+      "version": "v2.5.0"
+    }
+  ],
+  "runId": "43668440640"
+}
